@@ -1,0 +1,696 @@
+/**
+ * Booklet layout: A4 portrait, 210 x 297 mm.
+ *
+ * Loaded after the base stylesheet and before operator CSS, so anything set
+ * here overrides the 10pt default and is itself overridable.
+ */
+
+.idta-page {
+	width: 100%;
+	position: relative;
+}
+
+/**
+ * Every page after the first starts a new sheet.
+ *
+ * This is a plain class rather than an `.idta-page + .idta-page` sibling
+ * selector: mPDF does not apply adjacent-sibling selectors, so the break was
+ * silently ignored and pagination fell back to content overflow.
+ */
+.idta-page--break {
+	page-break-before: always;
+}
+
+.idta-page--artwork {
+	padding: 0;
+	margin: 0;
+}
+
+.idta-page__artwork {
+	width: 210mm;
+	height: 297mm;
+}
+
+/**
+ * Pages rebuilt as HTML instead of a scan. Padding reproduces the scanned
+ * margins: the artwork's text block sits about 24mm from each edge.
+ */
+.idta-page--content {
+	padding: 8mm 24mm 10mm 24mm;
+	font-family: dejavuserif;
+}
+
+/* ---- Cover ---- */
+
+.idta-cover {
+	text-align: center;
+	font-family: serif;
+	padding: 20mm 15mm 10mm 15mm;
+}
+
+.idta-cover__association {
+	font-size: 12pt;
+	font-weight: bold;
+	margin: 0 0 12mm 0;
+}
+
+.idta-cover__title {
+	font-size: 28pt;
+	font-weight: bold;
+	margin: 0 0 8mm 0;
+	line-height: 1.2;
+}
+
+.idta-cover__convention {
+	font-family: sans-serif;
+	font-size: 14pt;
+	font-weight: 500;
+	text-decoration: underline;
+	margin: 0 0 8mm 0;
+}
+
+.idta-cover__notice {
+	font-family: sans-serif;
+	font-size: 14pt;
+	font-weight: bold;
+	line-height: 1.4;
+	margin: 0 10mm 10mm 10mm;
+}
+
+.idta-cover__expiry {
+	font-family: sans-serif;
+	font-size: 12pt;
+	font-weight: bold;
+	margin: 0 0 10mm 0;
+}
+
+.idta-cover__expiry-value {
+	display: inline-block;
+	width: 70mm;
+	margin-left: 3mm;
+	border-bottom: 0.3mm solid #000000;
+	text-align: center;
+}
+
+.idta-cover__logo {
+	width: 60mm;
+	margin: 0 0 4mm 0;
+}
+
+.idta-cover__authority img {
+	width: 22mm;
+}
+
+.idta-cover__authority-label {
+	font-family: sans-serif;
+	font-size: 11pt;
+	margin: 0 0 6mm 0;
+}
+
+.idta-cover__qr {
+	width: 40mm;
+	height: 40mm;
+}
+
+.idta-cover__order {
+	font-size: 11pt;
+	font-weight: bold;
+	margin: 2mm 0 4mm 0;
+}
+
+.idta-cover__legal {
+	font-size: 8pt;
+	line-height: 1.35;
+	margin: 0 25mm;
+}
+
+/* ---- Holder details page ---- */
+
+/**
+ * The holder page must fit within 297mm including its own padding, or mPDF
+ * spills the trailing padding onto a blank following page. The block sizes
+ * below are budgeted to total roughly 230mm, leaving deliberate headroom for
+ * longer names and taller artwork.
+ */
+.idta-holder {
+	padding: 12mm 18mm;
+}
+
+.idta-holder__fields {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 6mm 0;
+}
+
+.idta-holder__field {
+	display: block;
+	width: 100%;
+	border-bottom: 0.25mm dashed #000000;
+	padding: 0 0 0.8mm 0;
+	margin: 0 0 2.4mm 0;
+}
+
+.idta-holder__num {
+	font-size: 11pt;
+	font-weight: bold;
+	padding-right: 3mm;
+}
+
+.idta-holder__value {
+	font-size: 13pt;
+}
+
+.idta-holder__row {
+	width: 100%;
+}
+
+/* ---- Category seals ---- */
+
+.idta-holder__categories {
+	float: left;
+	width: 40mm;
+}
+
+.idta-category {
+	margin-bottom: 1.5mm;
+	position: relative;
+}
+
+.idta-category__box {
+	width: 19mm;
+	height: 19mm;
+	border: 0.3mm solid #000000;
+	padding: 2mm;
+	font-size: 12pt;
+	font-weight: bold;
+}
+
+.idta-category__seal {
+	width: 17mm;
+	height: 17mm;
+	margin-top: -16.5mm;
+	margin-left: 3mm;
+}
+
+.idta-category__granted {
+	font-size: 8pt;
+	font-weight: bold;
+	margin-top: -13mm;
+	margin-left: 5mm;
+	color: #3b016f;
+}
+
+/* ---- Portrait, signature and QR ---- */
+
+.idta-holder__identity {
+	float: right;
+	width: 90mm;
+	text-align: center;
+	padding-top: 6mm;
+}
+
+.idta-holder__photo {
+	width: 40mm;
+	margin: 0 auto;
+}
+
+.idta-holder__portrait {
+	width: 40mm;
+	height: 48mm;
+	object-fit: cover;
+}
+
+.idta-holder__stamp {
+	width: 20mm;
+	margin-top: -20mm;
+	margin-left: -6mm;
+}
+
+.idta-holder__signature {
+	padding-top: 2mm;
+	min-height: 10mm;
+}
+
+.idta-holder__signature img {
+	width: 35mm;
+}
+
+.idta-holder__rule {
+	width: 70mm;
+	margin: 1mm auto 2mm auto;
+	border-bottom: 0.25mm dashed #000000;
+}
+
+.idta-holder__signature-label {
+	font-size: 10pt;
+	margin: 0 0 3mm 0;
+}
+
+.idta-holder__qr {
+	width: 24mm;
+	height: 24mm;
+}
+
+/* ---- Exclusions ---- */
+
+.idta-exclusions {
+	padding-top: 5mm;
+}
+
+.idta-exclusions__title {
+	text-align: center;
+	font-size: 14pt;
+	margin: 0;
+}
+
+.idta-exclusions__subtitle {
+	text-align: center;
+	font-size: 10pt;
+	margin: 0 0 4mm 0;
+}
+
+.idta-exclusions__grid {
+	width: 100%;
+}
+
+.idta-exclusions__cell {
+	width: 50%;
+	padding: 0 4mm 3mm 0;
+	vertical-align: bottom;
+}
+
+.idta-exclusions__numeral {
+	font-size: 10pt;
+	font-weight: bold;
+	padding-right: 2mm;
+}
+
+.idta-exclusions__line {
+	display: inline-block;
+	width: 70mm;
+	border-bottom: 0.25mm dashed #000000;
+}
+
+.idta-exclusions__note {
+	text-align: right;
+	font-size: 9pt;
+	margin: 4mm 0 0 0;
+}
+
+/* ---- Translation pages (booklet 4-22): shared layout ---- */
+
+/**
+ * One layout, nineteen languages. Content width is 162mm (210mm less the 24mm
+ * page padding on each side). Widths are explicit millimetres on purpose: mPDF
+ * collapses percentage table widths once a table is nested in a sized block.
+ *
+ * The .lp--rtl modifier mirrors the page for right-to-left languages.
+ */
+
+.lp {
+	font-size: 9pt;
+	line-height: 1.3;
+}
+
+/* Language flag, drawn as table cells so it stays vector-only. */
+.lp-flag {
+	width: 7.2mm;
+	border-collapse: collapse;
+	border: 0.15mm solid #999999;
+}
+
+.lp-flag__stripe {
+	width: 2.4mm;
+	height: 6mm;
+	padding: 0;
+}
+
+/* ---- Header: lead lines left, numbered holder fields right ---- */
+
+.lp-head {
+	width: 162mm;
+	border-collapse: collapse;
+	margin-top: 2mm;
+}
+
+.lp-head__lead {
+	width: 90mm;
+	vertical-align: top;
+	font-size: 10.5pt;
+	line-height: 1.35;
+	padding: 0;
+	white-space: nowrap;
+}
+
+.lp-head__label {
+	width: 72mm;
+	vertical-align: top;
+	text-align: right;
+	font-size: 10.5pt;
+	line-height: 1.35;
+	padding: 0;
+}
+
+/* ---- Vehicle category grid ---- */
+
+.lp-categories {
+	width: 162mm;
+	border-collapse: collapse;
+	margin-top: 4mm;
+}
+
+.lp-categories__text {
+	border: 0.3mm solid #000000;
+	padding: 1.8mm 2.2mm;
+	vertical-align: top;
+	font-size: 8.5pt;
+	line-height: 1.35;
+	height: 23mm;
+}
+
+.lp-categories__letter {
+	border: 0.3mm solid #000000;
+	width: 16mm;
+	text-align: center;
+	vertical-align: middle;
+	font-size: 15pt;
+	padding: 0;
+}
+
+/* ---- Two-column notes ---- */
+
+.lp-notes {
+	width: 162mm;
+	border-collapse: collapse;
+	margin-top: 2.5mm;
+}
+
+.lp-notes__col {
+	width: 78mm;
+	vertical-align: top;
+	font-size: 8.5pt;
+	line-height: 1.45;
+	padding: 0 6mm 0 0;
+}
+
+.lp-notes__col--last {
+	width: 78mm;
+	padding: 0;
+}
+
+/* ---- Exclusion block ---- */
+
+/**
+ * The horizontal rule spans the full content width but the vertical divider
+ * stops at 112mm, so the two cannot come from one box: this empty div draws
+ * the rule, and .lp-exclusion below carries the divider as its right border.
+ */
+.lp-exclusion-rule {
+	width: 162mm;
+	height: 0;
+	font-size: 0;
+	line-height: 0;
+	border-bottom: 0.3mm solid #000000;
+	margin-top: 6mm;
+}
+
+.lp-exclusion {
+	width: 109mm;
+	border-right: 0.3mm solid #000000;
+	padding: 1mm 3mm 2mm 0;
+}
+
+.lp-exclusion__title {
+	text-align: center;
+	font-size: 10.5pt;
+	margin: 0;
+}
+
+/* Sized to keep the sentence on one line inside the 109mm divider, as printed. */
+.lp-exclusion__intro {
+	font-size: 8.8pt;
+	margin: 0;
+	white-space: nowrap;
+}
+
+/* A label plus a fill-in rule. Widths are explicit; see the note above. */
+.lp-rule {
+	width: 108mm;
+	border-collapse: collapse;
+}
+
+.lp-rule__label {
+	width: 18mm;
+	white-space: nowrap;
+	vertical-align: bottom;
+	font-size: 9.5pt;
+	padding: 0;
+}
+
+.lp-rule__label--wide {
+	width: 34mm;
+}
+
+.lp-rule__line {
+	width: 90mm;
+	height: 5mm;
+	vertical-align: bottom;
+	border-bottom: 0.3mm solid #000000;
+	padding: 0;
+}
+
+.lp-rule__line--short {
+	width: 74mm;
+}
+
+/* ---- Authority stamp beside the place/date/signature lines ---- */
+
+.lp-stamp {
+	width: 108mm;
+	margin-top: 1mm;
+}
+
+.lp-stamp__seal {
+	float: left;
+	width: 30mm;
+}
+
+.lp-stamp__fields {
+	float: left;
+	width: 76mm;
+	padding-top: 1mm;
+}
+
+/**
+ * mPDF adds padding to the declared height, so height + padding-top must equal
+ * the width for this to render as a circle rather than an egg.
+ */
+.lp-seal {
+	width: 24mm;
+	height: 18mm;
+	padding-top: 6mm;
+	border: 0.3mm solid #000000;
+	border-radius: 50%;
+	text-align: center;
+	font-size: 7pt;
+	line-height: 1.3;
+}
+
+.lp-rule--stamp {
+	width: 76mm;
+}
+
+.lp-rule__line--stamp {
+	width: 52mm;
+}
+
+.lp-footnote {
+	font-size: 9pt;
+	line-height: 1.35;
+	width: 100mm;
+	margin: 3mm 0 0 0;
+}
+
+.lp-folio {
+	font-size: 10pt;
+	margin: 10mm 0 0 0;
+}
+
+.lp-rule__label--stamp {
+	width: 24mm;
+}
+
+/* ---- Right-to-left mirror (Arabic) ---- */
+
+/**
+ * mPDF has no logical-property support, so mirroring is done by restating the
+ * physical sides. Every horizontal side, float and alignment is flipped.
+ */
+
+.lp--rtl .lp-flag {
+	float: right;
+}
+
+.lp--rtl .lp-head {
+	clear: both;
+}
+
+.lp--rtl .lp-head__lead {
+	text-align: right;
+	white-space: normal;
+}
+
+.lp--rtl .lp-head__label {
+	text-align: left;
+}
+
+.lp--rtl .lp-categories__text {
+	text-align: right;
+}
+
+/* Notes print as one full-width block rather than two columns. */
+.lp-notes-block {
+	width: 162mm;
+	margin-top: 2.5mm;
+}
+
+.lp-notes-block__line {
+	font-size: 8.5pt;
+	line-height: 1.45;
+	text-align: right;
+	margin-bottom: 1mm;
+}
+
+/* The divider moves to the left edge, so the block is pushed right. */
+.lp--rtl .lp-exclusion {
+	border-right: none;
+	border-left: 0.3mm solid #000000;
+	padding: 1mm 0 2mm 3mm;
+	margin-left: 53mm;
+}
+
+.lp--rtl .lp-exclusion__intro {
+	text-align: right;
+}
+
+.lp--rtl .lp-stamp__seal {
+	float: right;
+}
+
+.lp--rtl .lp-stamp__fields {
+	float: right;
+}
+
+.lp--rtl .lp-footnote {
+	text-align: right;
+	width: 100mm;
+	margin-left: auto;
+}
+
+.lp--rtl .lp-folio {
+	text-align: right;
+}
+
+/* Shown in place of the flag when a tricolour strip would misrepresent it. */
+.lp-language {
+	font-size: 9pt;
+	height: 6mm;
+}
+
+.lp--rtl .lp-language {
+	text-align: right;
+}
+
+/* ---- Page 2: list of contracting states ---- */
+
+.states {
+	font-family: dejavuserif;
+}
+
+.states__intro {
+	font-size: 10.5pt;
+	line-height: 1.4;
+	text-align: center;
+	margin: 4mm 0 0 0;
+}
+
+.states__title {
+	font-size: 17pt;
+	font-weight: normal;
+	text-align: center;
+	margin: 7mm 0 5mm 0;
+}
+
+.states__grid {
+	width: 162mm;
+	border-collapse: collapse;
+}
+
+.states__cell {
+	width: 40.5mm;
+	font-family: dejavuserif;
+	font-size: 8pt;
+	line-height: 1.28;
+	padding: 0;
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+.states__footer {
+	font-size: 10.5pt;
+	line-height: 1.4;
+	text-align: center;
+	margin: 6mm 0 0 0;
+}
+
+/* ---- Page 3: language index ---- */
+
+.index {
+	font-family: dejavuserif;
+	text-align: center;
+}
+
+.index__title {
+	font-size: 30pt;
+	font-weight: normal;
+	margin: 14mm 0 18mm 0;
+}
+
+.index__list {
+	width: 116mm;
+	margin: 0 auto;
+	border-collapse: collapse;
+}
+
+.index__language {
+	width: 54mm;
+	font-size: 13pt;
+	text-align: left;
+	padding: 0 2mm 3.4mm 0;
+	vertical-align: bottom;
+	white-space: nowrap;
+}
+
+.index__leader {
+	width: 48mm;
+	border-bottom: 0.3mm dotted #000000;
+	padding: 0 0 3.4mm 0;
+	vertical-align: bottom;
+}
+
+.index__folio {
+	width: 14mm;
+	font-family: dejavuserif;
+	font-size: 13pt;
+	text-align: right;
+	padding: 0 0 3.4mm 0;
+	vertical-align: bottom;
+}
+
+.index__logo {
+	margin-top: 12mm;
+}
+
+.index__logo img {
+	width: 38mm;
+}

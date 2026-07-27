@@ -1,0 +1,190 @@
+/**
+ * Card layout: 85.6 x 53.98 mm.
+ *
+ * Loaded after the base stylesheet, so the point sizes here intentionally
+ * override the 10pt default — a credit-card face cannot carry 10pt body copy.
+ * Operator CSS is loaded after this file and overrides it in turn.
+ */
+
+.idta-card {
+	width: 85.6mm;
+	height: 53.98mm;
+	position: relative;
+	overflow: hidden;
+	background-color: #ffffff;
+	background-repeat: no-repeat;
+	background-position: center center;
+	/**
+	 * mPDF ignores `background-size`, drawing the artwork at its natural pixel
+	 * size and cropping it to the top-left. Its own `background-image-resize`
+	 * property is what actually scales a background; 5 stretches the artwork to
+	 * fit both dimensions, whether it is larger or smaller than the card.
+	 */
+	background-image-resize: 5;
+	text-transform: uppercase;
+}
+
+.idta-card--back {
+	page-break-before: always;
+}
+
+/* Reserve the artwork's header band before content starts. */
+.idta-card--front {
+	padding-top: 17mm;
+}
+
+.idta-card__disclaimer {
+	font-size: 4.2pt;
+	font-weight: bold;
+	line-height: 1.15;
+	text-align: right;
+	padding: 0 2mm 0.6mm 2mm;
+	text-transform: none;
+}
+
+.idta-card__body {
+	padding: 0 2mm;
+}
+
+/* ---- Portrait and signature column ---- */
+
+.idta-card__photo {
+	float: left;
+	width: 18mm;
+}
+
+.idta-card__portrait {
+	width: 17mm;
+	height: 21mm;
+	object-fit: cover;
+}
+
+.idta-card__stamp {
+	width: 8mm;
+	margin-top: -8mm;
+	margin-left: 10mm;
+}
+
+.idta-card__signature {
+	width: 17mm;
+	text-align: center;
+	padding-top: 0.5mm;
+}
+
+.idta-card__signature img {
+	width: 15mm;
+	height: 5mm;
+}
+
+.idta-card__signature-missing {
+	font-size: 5pt;
+}
+
+/* ---- Numbered field block ---- */
+
+.idta-card__details {
+	float: left;
+	width: 44mm;
+	padding-left: 1.5mm;
+}
+
+.idta-card__fields {
+	width: 100%;
+}
+
+.idta-card__field {
+	font-size: 5.4pt;
+	font-weight: bold;
+	line-height: 1.25;
+	padding: 0 0 0.4mm 0;
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+.idta-card__field--right {
+	text-align: left;
+	padding-left: 1mm;
+}
+
+.idta-card__num {
+	color: #3b016f;
+	font-weight: bold;
+	font-size: 5.4pt;
+	padding-right: 0.8mm;
+}
+
+.idta-card__value {
+	font-size: 5.4pt;
+	font-weight: bold;
+}
+
+/* Permit numbers are long; give them a little more room. */
+.idta-card__value--tight {
+	font-size: 5pt;
+}
+
+.idta-card__class {
+	padding-top: 0.6mm;
+}
+
+.idta-card__class-values {
+	font-weight: bold;
+	line-height: 1;
+}
+
+/* ---- Ghost portrait and QR column ---- */
+
+.idta-card__aside {
+	float: right;
+	width: 17mm;
+	text-align: right;
+}
+
+.idta-card__ghost {
+	width: 9mm;
+	height: 11mm;
+	object-fit: cover;
+}
+
+.idta-card__qr {
+	width: 15mm;
+	height: 15mm;
+	margin-top: 0.5mm;
+}
+
+.idta-card__footer {
+	font-size: 3.8pt;
+	text-align: right;
+	padding: 0 2mm;
+	text-transform: none;
+}
+
+/* ---- Fallback back face, used only when no artwork is configured ---- */
+
+.idta-card__back-table {
+	width: 60mm;
+	margin: 6mm 0 0 4mm;
+}
+
+.idta-card__back-label {
+	font-size: 5pt;
+	font-weight: bold;
+	color: #3b016f;
+	padding: 0.6mm 2mm 0.6mm 0;
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+.idta-card__back-value {
+	font-size: 5pt;
+	padding: 0.6mm 0;
+	vertical-align: top;
+}
+
+.idta-card__back-qr {
+	width: 14mm;
+	height: 14mm;
+	position: absolute;
+	right: 4mm;
+	bottom: 4mm;
+}

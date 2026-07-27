@@ -1,0 +1,308 @@
+<?php
+/**
+ * Settings repository.
+ *
+ * @package IDTA\PDF
+ */
+
+declare( strict_types=1 );
+
+namespace IDTA\PDF;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Typed access to the plugin option, with defaults.
+ */
+final class Settings {
+
+	/**
+	 * Option name.
+	 */
+	public const OPTION_KEY = 'idta_pdf_settings';
+
+	/**
+	 * Base font size, in points, applied when no custom CSS overrides it.
+	 */
+	public const DEFAULT_FONT_SIZE = 10.0;
+
+	/**
+	 * Cached option values.
+	 *
+	 * @var array<string,mixed>|null
+	 */
+	private ?array $values = null;
+
+	/**
+	 * Default settings.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function defaults(): array {
+		return array(
+			'font_size'        => self::DEFAULT_FONT_SIZE,
+			'font_family'      => 'dejavusans',
+			'custom_css'       => '',
+			'booklet_css'      => '',
+			'card_css'         => '',
+			'trigger_statuses' => array( 'processing', 'completed' ),
+			'documents'        => array( 'booklet', 'card' ),
+			/**
+			 * Email attachments are off by default: the booklet embeds every
+			 * scanned page at full resolution and routinely exceeds 10 MB,
+			 * which most mail servers reject. Prefer the download link, and
+			 * enable this only for the card or with lighter artwork.
+			 */
+			'attach_to_emails' => array(),
+			// Empty by default: qr_base_url() falls back to the current
+			// site's home_url() so QR links work out of the box.
+			'qr_base_url'      => '',
+			'qr_permit_secret' => '',
+			'qr_details_secret' => '',
+			'grayscale_ghost'  => true,
+			'debug_html'       => false,
+		);
+	}
+
+	/**
+	 * All settings, defaults merged in.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function all(): array {
+		if ( null === $this->values ) {
+			$stored = get_option( self::OPTION_KEY, array() );
+
+			$this->values = wp_parse_args(
+				is_array( $stored ) ? $stored : array(),
+				$this->defaults()
+			);
+		}
+
+		/**
+		 * Filters the resolved plugin settings.
+		 *
+		 * @param array<string,mixed> $values Settings.
+		 */
+		return apply_filters( 'idta_pdf_settings', $this->values );
+	}
+
+	/**
+	 * Single setting.
+	 *
+	 * @param string $key     Setting key.
+	 * @param mixed  $default Fallback when the key is unknown.
+	 *
+	 * @return mixed
+	 */
+	public function get( string $key, $default = null ) {
+		$values = $this->all();
+
+		return $values[ $key ] ?? $default;
+	}
+
+	/**
+	 * Persist settings.
+	 *
+	 * @param array<string,mixed> $values Raw values.
+	 */
+	public function save( array $values ): void {
+		update_option( self::OPTION_KEY, $this->sanitize( $values ) );
+
+		$this->values = null;
+	}
+
+	/**
+	 * Sanitize a settings payload.
+	 *
+	 * @param array<string,mixed> $input Raw values.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function sanitize( array $input ): array {
+		$defaults = $this->defaults();
+		$clean    = array();
+
+		$font_size = isset( $input['font_size'] ) ? (float) $input['font_size'] : self::DEFAULT_FONT_SIZE;
+
+		$clean['font_size'] = ( $font_size >= 4.0 && $font_size <= 72.0 )
+			? round( $font_size, 2 )
+			: self::DEFAULT_FONT_SIZE;
+
+		$clean['font_family'] = sanitize_key( (string) ( $input['font_family'] ?? $defaults['font_family'] ) );
+
+		foreach ( array( 'custom_css', 'booklet_css', 'card_css' ) as $css_key ) {
+			$clean[ $css_key ] = $this->sanitize_css( (string) ( $input[ $css_key ] ?? '' ) );
+		}
+
+		$statuses = (array) ( $input['trigger_statuses'] ?? $defaults['trigger_statuses'] );
+
+		$clean['trigger_statuses'] = array_values(
+			array_filter( array_map( 'sanitize_key', $statuses ) )
+		);
+
+		$documents = (array) ( $input['documents'] ?? $defaults['documents'] );
+
+		$clean['documents'] = array_values(
+			array_intersect( array( 'booklet', 'card' ), array_map( 'sanitize_key', $documents ) )
+		);
+
+		$emails = (array) ( $input['attach_to_emails'] ?? array() );
+
+		$clean['attach_to_emails'] = array_values(
+			array_filter( array_map( 'sanitize_key', $emails ) )
+		);
+
+		$clean['qr_base_url']       = esc_url_raw( (string) ( $input['qr_base_url'] ?? $defaults['qr_base_url'] ) );
+		$clean['qr_permit_secret']  = sanitize_text_field( (string) ( $input['qr_permit_secret'] ?? '' ) );
+		$clean['qr_details_secret'] = sanitize_text_field( (string) ( $input['qr_details_secret'] ?? '' ) );
+
+		$clean['grayscale_ghost'] = ! empty( $input['grayscale_ghost'] );
+		$clean['debug_html']      = ! empty( $input['debug_html'] );
+
+		return $clean;
+	}
+
+	/**
+	 * Strip anything that is not CSS from a stylesheet blob.
+	 *
+	 * `wp_strip_all_tags` removes an injected `</style><script>` payload while
+	 * leaving declarations, selectors and at-rules intact.
+	 *
+	 * @param string $css Raw CSS.
+	 *
+	 * @return string
+	 */
+	private function sanitize_css( string $css ): string {
+		$css = wp_strip_all_tags( $css );
+
+		return trim( str_replace( array( '<', '>' ), '', $css ) );
+	}
+
+	/**
+	 * Base font size in points.
+	 *
+	 * @return float
+	 */
+	public function font_size(): float {
+		$size = (float) $this->get( 'font_size', self::DEFAULT_FONT_SIZE );
+
+		return $size > 0 ? $size : self::DEFAULT_FONT_SIZE;
+	}
+
+	/**
+	 * Base font family.
+	 *
+	 * @return string
+	 */
+	public function font_family(): string {
+		$family = (string) $this->get( 'font_family', 'dejavusans' );
+
+		return '' !== $family ? $family : 'dejavusans';
+	}
+
+	/**
+	 * Order statuses that trigger generation.
+	 *
+	 * @return string[]
+	 */
+	public function trigger_statuses(): array {
+		$statuses = (array) $this->get( 'trigger_statuses', array( 'processing', 'completed' ) );
+
+		$statuses = array_values( array_filter( array_map( 'strval', $statuses ) ) );
+
+		return array() !== $statuses ? $statuses : array( 'processing' );
+	}
+
+	/**
+	 * Document types to generate.
+	 *
+	 * @return string[]
+	 */
+	public function enabled_documents(): array {
+		$documents = (array) $this->get( 'documents', array( 'booklet', 'card' ) );
+
+		$documents = array_values(
+			array_intersect( array( 'booklet', 'card' ), array_map( 'strval', $documents ) )
+		);
+
+		return array() !== $documents ? $documents : array( 'booklet', 'card' );
+	}
+
+	/**
+	 * Email IDs that receive the PDFs as attachments.
+	 *
+	 * @return string[]
+	 */
+	public function attachment_emails(): array {
+		return array_values( array_filter( array_map( 'strval', (array) $this->get( 'attach_to_emails', array() ) ) ) );
+	}
+
+	/**
+	 * Custom CSS shared by both documents.
+	 *
+	 * @return string
+	 */
+	public function custom_css(): string {
+		return (string) $this->get( 'custom_css', '' );
+	}
+
+	/**
+	 * Custom CSS for a single document type.
+	 *
+	 * @param string $document Document slug.
+	 *
+	 * @return string
+	 */
+	public function document_css( string $document ): string {
+		return (string) $this->get( $document . '_css', '' );
+	}
+
+	/**
+	 * Base URL used when building QR target links.
+	 *
+	 * @return string
+	 */
+	public function qr_base_url(): string {
+		return untrailingslashit( (string) $this->get( 'qr_base_url', '' ) );
+	}
+
+	/**
+	 * Secret used to sign the permit QR link.
+	 *
+	 * Falls back to a site-specific salt so links are never signed with an
+	 * empty key.
+	 *
+	 * @param string $context Either 'permit' or 'details'.
+	 *
+	 * @return string
+	 */
+	public function qr_secret( string $context = 'permit' ): string {
+		$key    = 'details' === $context ? 'qr_details_secret' : 'qr_permit_secret';
+		$secret = (string) $this->get( $key, '' );
+
+		if ( '' !== $secret ) {
+			return $secret;
+		}
+
+		return wp_salt( 'idta_pdf_' . $context );
+	}
+
+	/**
+	 * Whether the small duplicate portrait is rendered in grayscale.
+	 *
+	 * @return bool
+	 */
+	public function grayscale_ghost(): bool {
+		return (bool) $this->get( 'grayscale_ghost', true );
+	}
+
+	/**
+	 * Whether to keep the rendered HTML alongside each PDF for debugging.
+	 *
+	 * @return bool
+	 */
+	public function debug_html(): bool {
+		return (bool) $this->get( 'debug_html', false );
+	}
+}

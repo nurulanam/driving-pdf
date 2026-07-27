@@ -1,0 +1,33 @@
+{
+	"name": "am2am/idta-pdf",
+	"description": "Generates the International Driving Permit booklet (A4) and ID card (85.6 × 53.98 mm) PDFs from WooCommerce order meta.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"authors": [
+		{
+			"name": "am2am software",
+			"homepage": "https://am2am.com"
+		}
+	],
+	"require": {
+		"php": ">=8.0",
+		"ext-openssl": "*",
+		"mpdf/mpdf": "^8.2",
+		"endroid/qr-code": "^5.0 || ^4.8"
+	},
+	"suggest": {
+		"ext-gd": "Required to render the small duplicate portrait in grayscale."
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"sort-packages": true,
+		"platform": {
+			"php": "8.0.0"
+		}
+	},
+	"autoload": {
+		"psr-4": {
+			"IDTA\\PDF\\Vendor\\": "src/"
+		}
+	}
+}
