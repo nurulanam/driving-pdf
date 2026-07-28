@@ -27,14 +27,33 @@ final class Artwork {
 	private const PAGES_DIR = 'assets/img/pages';
 
 	/**
+	 * Directory holding the language flags, relative to the plugin.
+	 *
+	 * Files are named after the language label a translation page prints, so
+	 * `Français.png` is the flag on the French page.
+	 */
+	private const FLAGS_DIR = 'assets/img/Flag';
+
+	/**
 	 * Bundled branding files, keyed by artwork key.
 	 *
 	 * @var array<string,string>
 	 */
 	private const BRAND = array(
-		'logo'      => 'assets/img/idp-single-logo.png',
-		'signature' => 'assets/img/idp-signature.png',
-		'stamp'     => 'assets/img/blank-stamp.png',
+		// Cover: the plain seal, then the authorised signature beneath it.
+		'cover_logo' => 'assets/img/blank-stamp.png',
+		'signature'  => 'assets/img/idta-signature.png',
+		// The horizontal lockup, used on the language index.
+		'logo'       => 'assets/img/Idta logo.png',
+		// Holder page: stamped across the corner of the portrait.
+		'stamp'      => 'assets/img/blank-stamp.png',
+		// Back cover: the dotted world map, the full lockup, the UN emblem and
+		// the two QR codes.
+		'back_map'   => 'assets/img/24 map.png',
+		'wordmark'   => 'assets/img/Idta full 24.png',
+		'un_emblem'  => 'assets/img/UNCE.ORG.png',
+		'qr_left'    => 'assets/img/QR CODE1 24.png',
+		'qr_right'   => 'assets/img/QR CODE2 24.jpg',
 	);
 
 	/**
@@ -43,8 +62,8 @@ final class Artwork {
 	 * @var array<string,string>
 	 */
 	private const CARD = array(
-		'front' => 'assets/img/white-front.jpeg',
-		'back'  => 'assets/img/white-back.jpeg',
+		'front' => 'assets/img/white-front.jpg',
+		'back'  => 'assets/img/white-back.jpg',
 		'stamp' => 'assets/img/blank-stamp.png',
 	);
 
@@ -68,7 +87,7 @@ final class Artwork {
 	/**
 	 * Booklet branding artwork.
 	 *
-	 * @param string $key One of 'logo', 'signature' or 'stamp'.
+	 * @param string $key One of the keys in self::BRAND.
 	 *
 	 * @return string
 	 */
@@ -122,6 +141,31 @@ final class Artwork {
 		 * @param bool   $granted Whether the category is held.
 		 */
 		return (string) apply_filters( 'idta_pdf_seal_url', $default, $granted );
+	}
+
+	/**
+	 * Flag artwork for a translation page.
+	 *
+	 * Named after the language label rather than an ISO code so the bundled files
+	 * read the same way the page does. A language with no file falls back to the
+	 * drawn tricolour, or to printing its own name.
+	 *
+	 * @param string $label Language label, e.g. 'Français'.
+	 *
+	 * @return string Artwork reference, empty when there is none.
+	 */
+	public static function flag( string $label ): string {
+		$default = '' === $label
+			? ''
+			: self::path( self::FLAGS_DIR . '/' . $label . '.png' );
+
+		/**
+		 * Filters the flag artwork for a translation page.
+		 *
+		 * @param string $url   Artwork reference.
+		 * @param string $label Language label.
+		 */
+		return (string) apply_filters( 'idta_pdf_flag_url', $default, $label );
 	}
 
 	/**
@@ -193,6 +237,13 @@ final class Artwork {
 	 * Filenames are inconsistently zero-padded ("page-002", "page-0003"), so
 	 * they are ordered by extracted number rather than alphabetically.
 	 *
+	 * Every page this booklet prints now has a template or a language entry, so
+	 * no scan is actually required for a stock install — but interior_pages()
+	 * and closing_pages() still need *some* list of page numbers to loop over,
+	 * since Booklet_Document::describe_pages() only sees numbers, not the fact
+	 * that a template exists. Falling back to synthesise() when no scans are on
+	 * disk keeps that loop populated instead of silently emitting zero pages.
+	 *
 	 * @return string[]
 	 */
 	private static function pages(): array {
@@ -207,7 +258,7 @@ final class Artwork {
 		$found = '' !== $dir ? glob( $dir . '/*.*' ) : false;
 
 		if ( ! is_array( $found ) || array() === $found ) {
-			return self::$pages = array();
+			return self::$pages = self::synthesise();
 		}
 
 		$numbered = array();
@@ -234,6 +285,43 @@ final class Artwork {
 		);
 
 		return self::$pages = array_column( $numbered, 'file' );
+	}
+
+	/**
+	 * Page numbers covered by a bundled template or a language entry, standing in
+	 * for scans that are not on disk.
+	 *
+	 * Each is a placeholder string rather than a real path — describe_pages()
+	 * resolves the number to a template or language page before it ever tries to
+	 * treat the string as an image, so nothing attempts to read it as a file. A
+	 * page number covered by neither quietly renders nothing, exactly as an
+	 * unreadable scan would have.
+	 *
+	 * @return string[]
+	 */
+	private static function synthesise(): array {
+		$numbers = array_keys( Language_Pages::all() );
+
+		$dir = self::path( 'templates/pages' );
+
+		if ( '' !== $dir ) {
+			foreach ( (array) glob( $dir . '/page-*.php' ) as $file ) {
+				$number = self::page_number( $file );
+
+				if ( 0 !== $number ) {
+					$numbers[] = $number;
+				}
+			}
+		}
+
+		$numbers = array_unique( $numbers );
+
+		sort( $numbers );
+
+		return array_map(
+			static fn( int $number ): string => sprintf( 'page-%02d', $number ),
+			$numbers
+		);
 	}
 
 	/**

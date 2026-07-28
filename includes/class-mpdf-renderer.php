@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace IDTA\PDF;
 
+use Mpdf\Config\ConfigVariables;
 use Mpdf\Mpdf;
 
 defined( 'ABSPATH' ) || exit;
@@ -83,10 +84,17 @@ final class Mpdf_Renderer implements Renderer {
 			'margin_footer'    => 0,
 			'tempDir'          => $this->filesystem->temp_dir(),
 			'mode'             => 'utf-8',
+			// The bundled CJK and Ethiopic faces ship in a single hairline
+			// weight, so mPDF fakes bold by stroking the outline. Its default
+			// of 5 clogs small ideographs; 3 reads as the medium weight the
+			// scanned pages are set in without filling the counters.
+			'falseBoldWeight'  => 3,
 			// Every asset is embedded as a data URI, so the engine never needs
 			// to make its own outbound request.
 			'curlAllowUnsafeSslRequests' => false,
 		);
+
+		$config = array_merge( $config, $this->font_config() );
 
 		/**
 		 * Filters the mPDF configuration for a document.
@@ -142,6 +150,53 @@ final class Mpdf_Renderer implements Renderer {
 		}
 
 		return $bytes;
+	}
+
+	/**
+	 * mPDF font configuration, including any font the site has registered.
+	 *
+	 * mPDF only ships one face per script, and for some scripts that face is a
+	 * poor match for the printed booklet. Rather than bundle more fonts, a site
+	 * can point mPDF at its own directory and name the face on a language page.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function font_config(): array {
+		/**
+		 * Filters directories mPDF searches for font files.
+		 *
+		 * Added to mPDF's own font directory rather than replacing it, so the
+		 * bundled faces keep working.
+		 *
+		 * @param string[] $directories Absolute directory paths.
+		 */
+		$directories = (array) apply_filters( 'idta_pdf_font_directories', array() );
+
+		$config = array(
+			// Only the faces actually shipped. mPDF's own registry names about
+			// forty, and the distribution carries the files for eight; handing it
+			// the short list means a missing file can never be requested, and
+			// Fonts::files() keeps the build script in step. See Fonts.
+			'fontdata'         => Fonts::registry(),
+			'default_font'     => Fonts::DEFAULT_FONT,
+			// mPDF's generic-family maps default to condensed faces that are no
+			// longer shipped, so point them at what is.
+			'sans_fonts'       => array( 'sans', 'sans-serif', 'cursive', 'fantasy', 'dejavusans' ),
+			'serif_fonts'      => array( 'serif', 'dejavuserif', 'freeserif' ),
+			'mono_fonts'       => array( 'mono', 'monospace' ),
+			// Consulted for a character the requested face lacks; both of these
+			// default to faces that are not shipped.
+			'backupSubsFont'   => Fonts::FALLBACKS,
+			'backupSIPFont'    => Fonts::DEFAULT_FONT,
+		);
+
+		if ( array() !== $directories ) {
+			$defaults = ( new ConfigVariables() )->getDefaults();
+
+			$config['fontDir'] = array_merge( (array) $defaults['fontDir'], array_values( $directories ) );
+		}
+
+		return $config;
 	}
 
 	/**

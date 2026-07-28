@@ -44,7 +44,7 @@
 
 .idta-cover {
 	text-align: center;
-	font-family: serif;
+	font-family: dejavuserif;
 	padding: 20mm 15mm 10mm 15mm;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .idta-cover__convention {
-	font-family: sans-serif;
+	font-family: dejavusans;
 	font-size: 14pt;
 	font-weight: 500;
 	text-decoration: underline;
@@ -70,7 +70,7 @@
 }
 
 .idta-cover__notice {
-	font-family: sans-serif;
+	font-family: dejavusans;
 	font-size: 14pt;
 	font-weight: bold;
 	line-height: 1.4;
@@ -78,7 +78,7 @@
 }
 
 .idta-cover__expiry {
-	font-family: sans-serif;
+	font-family: dejavusans;
 	font-size: 12pt;
 	font-weight: bold;
 	margin: 0 0 10mm 0;
@@ -98,11 +98,12 @@
 }
 
 .idta-cover__authority img {
-	width: 22mm;
+	width: 32mm;
+	margin-bottom: 1mm;
 }
 
 .idta-cover__authority-label {
-	font-family: sans-serif;
+	font-family: dejavusans;
 	font-size: 11pt;
 	margin: 0 0 6mm 0;
 }
@@ -214,16 +215,34 @@
 	margin: 0 auto;
 }
 
+/* Square, so a portrait upload is not stretched to a passport ratio. */
 .idta-holder__portrait {
 	width: 40mm;
-	height: 48mm;
+	height: 40mm;
 	object-fit: cover;
 }
 
+/**
+ * Stamped across the portrait's bottom-left corner and centred on it: half the
+ * seal hangs past the left edge and half below the bottom, the -50% offset the
+ * printed permit uses.
+ *
+ * The offsets are half the seal's own width, because the stamp follows the
+ * portrait in flow — mPDF has no absolute positioning, so shifting it back is the
+ * only way to reach a corner. The left-aligned wrapper is what makes them
+ * measurable: the identity column is centred, and a centred image takes its
+ * margins from wherever the centring put it.
+ */
+.idta-holder__stamp-box {
+	text-align: left;
+	margin-top: -11mm;
+	line-height: 0;
+	font-size: 0;
+}
+
 .idta-holder__stamp {
-	width: 20mm;
-	margin-top: -20mm;
-	margin-left: -6mm;
+	width: 22mm;
+	margin-left: -11mm;
 }
 
 .idta-holder__signature {
@@ -269,26 +288,49 @@
 	margin: 0 0 4mm 0;
 }
 
+/**
+ * Four columns, being two numeral/rule pairs. The rule is the cell's own bottom
+ * border — mPDF draws nothing for an empty inline-block, so a bordered span left
+ * the numerals with no line beside them.
+ */
 .idta-exclusions__grid {
-	width: 100%;
+	width: 174mm;
+	border-collapse: collapse;
 }
 
-.idta-exclusions__cell {
-	width: 50%;
-	padding: 0 4mm 3mm 0;
+/**
+ * The numeral and its rule share a height so they bottom-align on the same line:
+ * with the height on the rule cell alone, mPDF centred the numeral in the taller
+ * row and it floated above the rule.
+ *
+ * Row spacing is that height rather than bottom padding, because a border is
+ * drawn outside the padding — padding drops the rule below the numeral.
+ */
+.idta-exclusions__numeral,
+.idta-exclusions__line {
+	height: 5.5mm;
 	vertical-align: bottom;
 }
 
+/**
+ * The left padding is the gap between the two numeral/rule pairs.
+ *
+ * line-height sets how far the baseline sits above the bottom of the line box,
+ * and the rule is drawn at the cell bottom — so this, not vertical-align, is what
+ * finally puts the numeral on its rule instead of a descender's height above it.
+ */
 .idta-exclusions__numeral {
+	width: 15mm;
 	font-size: 10pt;
 	font-weight: bold;
-	padding-right: 2mm;
+	line-height: 1;
+	padding: 0 2mm 0 5mm;
 }
 
 .idta-exclusions__line {
-	display: inline-block;
-	width: 70mm;
+	width: 72mm;
 	border-bottom: 0.25mm dashed #000000;
+	padding: 0;
 }
 
 .idta-exclusions__note {
@@ -312,6 +354,20 @@
 	line-height: 1.3;
 }
 
+/**
+ * Everything above the folio. The fixed height is what puts the folio at the
+ * bottom of the page: mPDF ignores `position: absolute`, so the only way to
+ * place a block at a known height is to reserve the space above it.
+ *
+ * 268mm plus the page's own 8mm top padding puts the folio at 276-281mm, where
+ * the scans print it, clear of the 10mm bottom margin. The tallest language page
+ * (Arabic) needs 258mm, so there is about 10mm of headroom before a correction
+ * to the text could push a page over.
+ */
+.lp-body {
+	height: 268mm;
+}
+
 /* Language flag, drawn as table cells so it stays vector-only. */
 .lp-flag {
 	width: 7.2mm;
@@ -323,6 +379,16 @@
 	width: 2.4mm;
 	height: 6mm;
 	padding: 0;
+}
+
+/* Real flag artwork. The bundled files are square, as the scans print them. */
+.lp-flag-box {
+	width: 7.5mm;
+	height: 7.5mm;
+}
+
+.lp-flag-box__image {
+	width: 7.5mm;
 }
 
 /* ---- Header: lead lines left, numbered holder fields right ---- */
@@ -368,6 +434,10 @@
 	height: 23mm;
 }
 
+/**
+ * The letters are the one element common to all nineteen pages, so the template
+ * sets them in dejavuserif inline regardless of the page's script font.
+ */
 .lp-categories__letter {
 	border: 0.3mm solid #000000;
 	width: 16mm;
@@ -420,6 +490,12 @@
 	padding: 1mm 3mm 2mm 0;
 }
 
+/* Closed off by a rule under the signature line, as printed. */
+.lp-exclusion__box {
+	border-bottom: 0.3mm solid #000000;
+	padding-bottom: 1.5mm;
+}
+
 .lp-exclusion__title {
 	text-align: center;
 	font-size: 10.5pt;
@@ -433,40 +509,59 @@
 	white-space: nowrap;
 }
 
-/* A label plus a fill-in rule. Widths are explicit; see the note above. */
+/**
+ * A label plus a fill-in rule. The rule starts straight after the label, as
+ * printed; a shared label column left a short word like "Date" adrift from its
+ * line.
+ *
+ * Both column widths are written inline by the template in millimetres, the
+ * label's measured from its own text. Asking mPDF to shrink the label to content
+ * instead means giving the rule cell 100%, which mPDF reads as an overflow and
+ * answers by shrinking the whole table's type — so "Signature" printed a size
+ * smaller than "Lieu" next to it. Nothing here may set a width on either cell.
+ *
+ * Keep .lp-rule__label's font-size in step with $lp_label_pt in the template:
+ * that is the size the measurement assumes.
+ */
+/* The wrapper carries no width: the table's own width is written inline, and a
+   106mm wrapper inside the 74mm stamp column risked dropping the float. */
+.lp-rule-wrap {
+	margin: 0;
+	padding: 0;
+}
+
+/* Blank continuation lines sit under the reason line rather than at the edge. */
+.lp-rule-wrap--continue {
+	margin-left: 26mm;
+}
+
 .lp-rule {
-	width: 108mm;
 	border-collapse: collapse;
 }
 
 .lp-rule__label {
-	width: 18mm;
 	white-space: nowrap;
 	vertical-align: bottom;
 	font-size: 9.5pt;
 	padding: 0;
 }
 
-.lp-rule__label--wide {
-	width: 34mm;
-}
-
 .lp-rule__line {
-	width: 90mm;
 	height: 5mm;
 	vertical-align: bottom;
 	border-bottom: 0.3mm solid #000000;
 	padding: 0;
 }
 
-.lp-rule__line--short {
-	width: 74mm;
-}
-
 /* ---- Authority stamp beside the place/date/signature lines ---- */
 
+/**
+ * The seal and the three fields sit side by side, so the two floats plus this
+ * block have to stay inside the exclusion column's 106mm: at 108mm the mirrored
+ * page dropped the fields below the seal instead of beside it.
+ */
 .lp-stamp {
-	width: 108mm;
+	width: 104mm;
 	margin-top: 1mm;
 }
 
@@ -477,7 +572,7 @@
 
 .lp-stamp__fields {
 	float: left;
-	width: 76mm;
+	width: 74mm;
 	padding-top: 1mm;
 }
 
@@ -496,28 +591,17 @@
 	line-height: 1.3;
 }
 
-.lp-rule--stamp {
-	width: 76mm;
-}
-
-.lp-rule__line--stamp {
-	width: 52mm;
-}
-
 .lp-footnote {
 	font-size: 9pt;
 	line-height: 1.35;
 	width: 100mm;
-	margin: 3mm 0 0 0;
+	margin: 2mm 0 0 0;
 }
 
+/* Placed by .lp-body's fixed height; see the note there. */
 .lp-folio {
 	font-size: 10pt;
-	margin: 10mm 0 0 0;
-}
-
-.lp-rule__label--stamp {
-	width: 24mm;
+	margin: 0;
 }
 
 /* ---- Right-to-left mirror (Arabic) ---- */
@@ -527,8 +611,19 @@
  * physical sides. Every horizontal side, float and alignment is flipped.
  */
 
-.lp--rtl .lp-flag {
+.lp--rtl .lp-flag,
+.lp--rtl .lp-flag-box {
 	float: right;
+}
+
+/* The label moves to the right of the rule, so its text goes with it. */
+.lp--rtl .lp-rule__label {
+	text-align: right;
+}
+
+.lp--rtl .lp-rule-wrap--continue {
+	margin-left: 0;
+	margin-right: 26mm;
 }
 
 .lp--rtl .lp-head {
@@ -657,24 +752,44 @@
 }
 
 .index__list {
-	width: 116mm;
+	width: 126mm;
 	margin: 0 auto;
 	border-collapse: collapse;
+}
+
+/**
+ * The same flag the language's own page prints, ahead of its name.
+ *
+ * Row spacing is the leader cell's height, not bottom padding on these cells: a
+ * border is drawn outside the padding, so padding pushed the dotted rule 3.4mm
+ * below the name it belongs to.
+ */
+.index__flag {
+	width: 10mm;
+	padding: 0 3mm 0 0;
+	vertical-align: bottom;
+	line-height: 0;
+	font-size: 0;
+}
+
+.index__flag-image {
+	width: 6.5mm;
 }
 
 .index__language {
 	width: 54mm;
 	font-size: 13pt;
 	text-align: left;
-	padding: 0 2mm 3.4mm 0;
+	padding: 0 2mm 0 0;
 	vertical-align: bottom;
 	white-space: nowrap;
 }
 
 .index__leader {
 	width: 48mm;
+	height: 9.5mm;
 	border-bottom: 0.3mm dotted #000000;
-	padding: 0 0 3.4mm 0;
+	padding: 0;
 	vertical-align: bottom;
 }
 
@@ -683,7 +798,7 @@
 	font-family: dejavuserif;
 	font-size: 13pt;
 	text-align: right;
-	padding: 0 0 3.4mm 0;
+	padding: 0;
 	vertical-align: bottom;
 }
 
@@ -692,5 +807,63 @@
 }
 
 .index__logo img {
-	width: 38mm;
+	width: 46mm;
+}
+
+/* ---- Page 24: back cover ---- */
+
+.back {
+	font-family: dejavuserif;
+	text-align: center;
+}
+
+/**
+ * Pulled up by the page's own 8mm top padding so the map sits flush with the
+ * page edge, as the scan prints it, rather than starting 8mm below it.
+ */
+.back__map {
+	margin: -8mm -24mm 0 -24mm;
+}
+
+.back__map img {
+	width: 162mm;
+}
+
+.back__wordmark {
+	margin-top: 16mm;
+}
+
+.back__wordmark img {
+	width: 52mm;
+}
+
+.back__contact {
+	font-size: 12pt;
+	line-height: 1.5;
+	margin: 12mm 0 0 0;
+}
+
+/**
+ * A table, not three floats: mPDF gives floated siblings no shared baseline, so
+ * the emblem would not sit level between the two codes.
+ */
+.back__marks {
+	width: 110mm;
+	margin: 40mm auto 0 auto;
+	border-collapse: collapse;
+}
+
+.back__mark {
+	width: 36.6mm;
+	text-align: center;
+	vertical-align: middle;
+	padding: 0;
+}
+
+.back__qr {
+	width: 22mm;
+}
+
+.back__emblem {
+	width: 26mm;
 }

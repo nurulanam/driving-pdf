@@ -17,6 +17,13 @@ defined( 'ABSPATH' ) || exit;
 final class Booklet_Document extends Document {
 
 	/**
+	 * Memoised language definitions with their flag artwork resolved.
+	 *
+	 * @var array<int,array<string,mixed>>|null
+	 */
+	private ?array $languages = null;
+
+	/**
 	 * {@inheritDoc}
 	 *
 	 * @return string
@@ -95,15 +102,75 @@ final class Booklet_Document extends Document {
 	protected function context(): array {
 		$context = parent::context();
 
+		// The index page needs the same flags the translation pages print, so the
+		// languages are resolved once and shared rather than embedded twice.
+		$context['languages'] = $this->languages();
+
 		$context['interior_pages'] = $this->describe_pages( Artwork::interior_pages( $this ) );
 		$context['closing_pages']  = $this->describe_pages( Artwork::closing_pages( $this ) );
 		$context['seal']           = $this->images->embed( Artwork::seal( true ) );
 		$context['seal_blank']     = $this->images->embed( Artwork::seal( false ) );
-		$context['logo']           = $this->images->embed( Artwork::brand( 'logo' ) );
-		$context['authority_sign'] = $this->images->embed( Artwork::brand( 'signature' ) );
-		$context['stamp']          = $this->images->embed( Artwork::brand( 'stamp' ) );
+
+		foreach ( array(
+			'cover_logo'     => 'cover_logo',
+			'logo'           => 'logo',
+			'authority_sign' => 'signature',
+			'stamp'          => 'stamp',
+			'back_map'       => 'back_map',
+			'wordmark'       => 'wordmark',
+			'un_emblem'      => 'un_emblem',
+			'qr_left'        => 'qr_left',
+			'qr_right'       => 'qr_right',
+		) as $key => $artwork ) {
+			$context[ $key ] = $this->images->embed( Artwork::brand( $artwork ) );
+		}
+
+		/**
+		 * Filters the contact details printed on the back cover.
+		 *
+		 * @param string $site Website, without a scheme.
+		 */
+		$context['brand_site'] = (string) apply_filters( 'idta_pdf_brand_site', 'idta.com' );
+
+		/**
+		 * Filters the support address printed on the back cover.
+		 *
+		 * @param string $email Support address.
+		 */
+		$context['brand_email'] = (string) apply_filters( 'idta_pdf_brand_email', 'support@idta.com' );
 
 		return $context;
+	}
+
+	/**
+	 * Language definitions with their flag artwork resolved, keyed by page number.
+	 *
+	 * Flags are declared as a path or URL; resolving them here means the templates
+	 * only ever deal with something the engine can read locally, and the index page
+	 * and the translation pages cannot end up with different artwork.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function languages(): array {
+		if ( null !== $this->languages ) {
+			return $this->languages;
+		}
+
+		$this->languages = array();
+
+		foreach ( Language_Pages::all() as $number => $language ) {
+			$flag = (string) $language['flag_image'];
+
+			if ( '' === $flag ) {
+				$flag = Artwork::flag( (string) $language['label'] );
+			}
+
+			$language['flag_image'] = '' === $flag ? '' : $this->images->embed( $flag );
+
+			$this->languages[ $number ] = $language;
+		}
+
+		return $this->languages;
 	}
 
 	/**
@@ -145,8 +212,9 @@ final class Booklet_Document extends Document {
 				continue;
 			}
 
-			// Otherwise a translation page renders from the shared layout.
-			$language = Language_Pages::get( $number );
+			// Otherwise a translation page renders from the shared layout, with the
+			// flag artwork already resolved by languages().
+			$language = $this->languages()[ $number ] ?? null;
 
 			if ( null !== $language ) {
 				$shared = $this->locate_template( 'pages/language-page.php' );

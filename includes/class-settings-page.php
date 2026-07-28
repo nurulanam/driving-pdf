@@ -167,15 +167,28 @@ final class Settings_Page {
 							<label for="idta-font-family"><?php esc_html_e( 'Base font family', 'idta-pdf' ); ?></label>
 						</th>
 						<td>
-							<input
-								type="text"
-								id="idta-font-family"
-								name="idta_pdf[font_family]"
-								value="<?php echo esc_attr( (string) $values['font_family'] ); ?>"
-								class="regular-text"
-							>
+							<?php
+							/*
+							 * A list rather than free text: the distribution ships
+							 * only the faces it needs, so a name typed by hand
+							 * would silently fall back to the default.
+							 */
+							$font_choices = array_keys( Fonts::registry() );
+
+							sort( $font_choices );
+							?>
+							<select id="idta-font-family" name="idta_pdf[font_family]">
+								<?php foreach ( $font_choices as $font_choice ) : ?>
+									<option
+										value="<?php echo esc_attr( $font_choice ); ?>"
+										<?php selected( (string) $values['font_family'], $font_choice ); ?>
+									>
+										<?php echo esc_html( $font_choice ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
 							<p class="description">
-								<?php esc_html_e( 'An mPDF font name, for example dejavusans, freeserif or helvetica.', 'idta-pdf' ); ?>
+								<?php esc_html_e( 'The base face for both documents. Translation pages set their own face per script. Register another with the idta_pdf_font_data filter and it appears here.', 'idta-pdf' ); ?>
 							</p>
 						</td>
 					</tr>

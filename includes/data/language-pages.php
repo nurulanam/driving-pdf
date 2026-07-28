@@ -18,12 +18,23 @@
  *   font         An mPDF font that covers the script:
  *                  dejavuserif    Latin, Cyrillic, Turkish, Lithuanian, Vietnamese
  *                  xbriyaz        Arabic
- *                  sun-exta       Chinese, Japanese, Korean
+ *                  sun-exta       Chinese, Japanese
+ *                  unbatang       Korean
  *                  abyssinicasil  Amharic
+ *                  freeserif      Devanagari (Hindi)
+ *                  garuda         Thai
+ *                Register your own with the `idta_pdf_font_data` filter and
+ *                name it here.
+ *   weight       'bold' asks mPDF to thicken the face. The bundled CJK and
+ *                Ethiopic fonts ship in one hairline weight, which prints far
+ *                lighter than the scans; mPDF strokes the outline to fake the
+ *                missing bold, which is what closes that gap.
  *   rtl          true mirrors the whole page (flag, letter column, stamp, divider).
  *   flag         Three colours for a vertical tricolour strip, or array() to
  *                print the language name instead. A three-stripe block is only
  *                an honest rendering of an actual vertical tricolour.
+ *   flag_image   Path or URL to real flag artwork. Set, it replaces both the
+ *                stripe block and the language name.
  *   lead_driver  Sentence beside holder field 1.
  *   lead_valid   Sentence beside holder field 5.
  *   holder       The five numbered holder fields.
@@ -559,6 +570,7 @@ return array(
 		'label'       => '中文',
 		'folio'       => '5',
 		'font'        => 'sun-exta',
+		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '驾驶员资料：',
 		'lead_valid'  => '本许可证适用的车辆类别：',
@@ -599,6 +611,7 @@ return array(
 		'label'       => '日本語',
 		'folio'       => '16',
 		'font'        => 'sun-exta',
+		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '運転者に関する事項:',
 		'lead_valid'  => '本許可証が有効な車両:',
@@ -639,6 +652,7 @@ return array(
 		'label'       => 'አማርኛ',
 		'folio'       => '10',
 		'font'        => 'abyssinicasil',
+		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => 'የአሽከርካሪ መረጃ:',
 		'lead_valid'  => 'ፈቃዱ የሚሰራባቸው ተሽከርካሪዎች:',
@@ -678,7 +692,8 @@ return array(
 		'code'        => 'ko',
 		'label'       => '한국어',
 		'folio'       => '19',
-		'font'        => 'sun-exta',
+		'font'        => 'unbatang',
+		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '운전자에 관한 사항:',
 		'lead_valid'  => '허가증이 유효한 차량:',

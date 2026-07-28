@@ -107,8 +107,8 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 		<span class="idta-cover__expiry-value"><?php echo esc_html( $context['expiry_date'] ); ?></span>
 	</div>
 
-	<?php if ( '' !== $context['logo'] ) : ?>
-		<img class="idta-cover__logo" src="<?php echo esc_attr( $context['logo'] ); ?>" alt="">
+	<?php if ( '' !== $context['cover_logo'] ) : ?>
+		<img class="idta-cover__logo" src="<?php echo esc_attr( $context['cover_logo'] ); ?>" alt="">
 	<?php endif; ?>
 
 	<?php if ( '' !== $context['authority_sign'] ) : ?>
@@ -197,8 +197,18 @@ endforeach;
 					<img class="idta-holder__portrait" src="<?php echo esc_attr( $context['photo'] ); ?>" alt="">
 				<?php endif; ?>
 
+				<?php
+				/*
+				 * The stamp needs its own left-aligned block. The identity column
+				 * is centred, and a centred inline image measures its margins from
+				 * where the centring put it, so the seal drifted to the middle of
+				 * the portrait instead of its corner.
+				 */
+				?>
 				<?php if ( '' !== $context['stamp'] ) : ?>
-					<img class="idta-holder__stamp" src="<?php echo esc_attr( $context['stamp'] ); ?>" alt="">
+					<div class="idta-holder__stamp-box">
+						<img class="idta-holder__stamp" src="<?php echo esc_attr( $context['stamp'] ); ?>" alt="">
+					</div>
 				<?php endif; ?>
 			</div>
 
@@ -226,17 +236,22 @@ endforeach;
 		<p class="idta-exclusions__title"><?php esc_html_e( 'EXCLUSIONS', 'idta-pdf' ); ?></p>
 		<p class="idta-exclusions__subtitle"><?php esc_html_e( '(pays)', 'idta-pdf' ); ?></p>
 
+		<?php
+		/*
+		 * The dashed rule is a cell border, not a bordered span: mPDF draws
+		 * nothing at all for an empty inline-block, so the numerals printed on
+		 * their own with no line to write on. Two numeral/rule pairs per row give
+		 * the printed two-column layout without nesting a table in a cell, which
+		 * mPDF also ignores.
+		 */
+		?>
 		<table class="idta-exclusions__grid">
 			<?php for ( $row = 0; $row < 4; $row++ ) : ?>
 				<tr>
-					<td class="idta-exclusions__cell">
-						<span class="idta-exclusions__numeral"><?php echo esc_html( $exclusion_numerals[ $row ] ); ?></span>
-						<span class="idta-exclusions__line"></span>
-					</td>
-					<td class="idta-exclusions__cell">
-						<span class="idta-exclusions__numeral"><?php echo esc_html( $exclusion_numerals[ $row + 4 ] ); ?></span>
-						<span class="idta-exclusions__line"></span>
-					</td>
+					<?php foreach ( array( $row, $row + 4 ) as $index ) : ?>
+						<td class="idta-exclusions__numeral"><?php echo esc_html( $exclusion_numerals[ $index ] ); ?></td>
+						<td class="idta-exclusions__line"></td>
+					<?php endforeach; ?>
 				</tr>
 			<?php endfor; ?>
 		</table>

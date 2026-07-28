@@ -32,7 +32,9 @@ It wires up:
 | `idta_pdf_booklet_interior_pages` | Scanned booklet pages, before the holder page |
 | `idta_pdf_booklet_closing_pages` | Pages after the holder page |
 | `idta_pdf_seal_url` | Per-category seal (granted / not granted) |
-| `idta_pdf_brand_url` | Booklet `logo`, `signature`, `stamp` |
+| `idta_pdf_brand_url` | Booklet `cover_logo`, `logo`, `signature`, `stamp`, `wordmark`, `un_emblem`, `qr_left`, `qr_right` |
+| `idta_pdf_flag_url` | Per-language flag on a translation page |
+| `idta_pdf_brand_site`, `idta_pdf_brand_email` | Contact details on the back cover |
 | `idta_pdf_card_artwork_url` | Card `front`, `back`, `stamp` |
 
 Artwork may be an absolute URL, a site-relative path, or a local path. Anything
@@ -105,6 +107,7 @@ from the scan filenames, so `final-booklet-IDPA_page-0006.jpg` is page 6 →
 | --- | --- |
 | 2 — contracting states | `templates/pages/page-02.php` |
 | 3 — language index | `templates/pages/page-03.php` (generated from the language data, so it cannot drift) |
+| 24 — back cover | `templates/pages/page-24.php` |
 
 **2. A language entry** — booklet pages 4–22 are one page repeated in nineteen
 languages: identical layout, translated strings. They are therefore *not*
@@ -117,10 +120,10 @@ translate the strings, set `font` and `rtl`. To add one without editing the
 plugin, use the `idta_pdf_language_pages` filter. A page with no entry keeps
 rendering from its scan.
 
-Each entry holds: `code`, `label`, `folio`, `font`, `rtl`, `flag`,
-`lead_driver`, `lead_valid`, `holder` (5 fields), `categories` (A–E), `notes`
-(2 columns), and `exclusion` (title, intro, country, reason, seal, place, date,
-signature, footnote).
+Each entry holds: `code`, `label`, `folio`, `font`, `weight`, `rtl`, `flag`,
+`flag_image`, `lead_driver`, `lead_valid`, `holder` (5 fields), `categories`
+(A–E), `notes` (2 columns), and `exclusion` (title, intro, country, reason,
+seal, place, date, signature, footnote).
 
 `font` must cover the script *and* be registered with mPDF:
 
@@ -128,16 +131,61 @@ signature, footnote).
 | --- | --- |
 | `dejavuserif` | Latin, Cyrillic, Turkish, Lithuanian, Vietnamese |
 | `xbriyaz` | Arabic |
-| `sun-exta` | Chinese, Japanese, Korean |
+| `sun-exta` | Chinese, Japanese |
+| `unbatang` | Korean |
 | `abyssinicasil` | Amharic |
 | `freeserif` | Devanagari (Hindi) |
 | `garuda` | Thai |
 
+`weight => 'bold'` thickens the face. mPDF's bundled CJK and Ethiopic fonts ship
+in one hairline weight that prints far lighter than the scans, so those pages ask
+for bold and mPDF strokes the outline to fake the missing weight. The stroke
+width is set by `falseBoldWeight` in the renderer — mPDF's default of 5 clogs
+small ideographs, so it runs at 3.
+
 `rtl => true` mirrors the whole page — flag, letter column, stamp and divider
 all swap sides, as page 5 (Arabic) is printed.
 
-Only the back cover (page 24) remains a scan: it is genuine artwork — world map,
-IDPA logo, UN emblem, QR codes — not text.
+The vehicle-category letters A–E are the one element identical on all nineteen
+pages, so they are always set in `dejavuserif` whatever script font the page
+uses.
+
+### Flags
+
+Flags come from `assets/img/Flag/`, named after the language label the page
+prints — `Français.png` is the flag on the French page. All nineteen are bundled.
+
+Override one file at a time with the `idta_pdf_flag_url` filter, or set
+`flag_image` on a language entry to a path or URL. With no artwork at all a page
+falls back to `flag` (three colours drawn as a vertical tricolour — the only flag
+a three-cell strip renders honestly), and failing that prints the language name
+rather than misrepresent a flag.
+
+### Registering another font
+
+mPDF bundles one face per script, and for some scripts it is a poor match — the
+Ethiopic face is the only one available and does not match the printed booklet.
+Point mPDF at your own file instead:
+
+```php
+add_filter( 'idta_pdf_font_directories', fn( $dirs ) => array_merge( $dirs, array( '/srv/fonts/' ) ) );
+
+add_filter(
+	'idta_pdf_font_data',
+	fn( $fonts ) => array_merge(
+		$fonts,
+		array( 'notoserifethiopic' => array( 'R' => 'NotoSerifEthiopic-Regular.ttf' ) )
+	)
+);
+```
+
+Then name it as the page's `font`. Both filters add to mPDF's own defaults rather
+than replacing them, and a name registered this way is accepted by
+`Language_Pages` too.
+
+No booklet page is a scan any more. The back cover is the one page that is mostly
+artwork rather than text, so it is assembled from the individual map, logo, emblem
+and QR files instead of one flattened image.
 
 Page templates receive the same `$document`, `$data` and `$context` variables as
 the main templates, so a converted page can print real order data if wanted.
@@ -166,17 +214,33 @@ the page templates are built around them:
   glyph as a hollow box — easy to miss in a script you do not read.
   `Language_Pages` checks the name, falls back to the default and logs a warning,
   but only at render time.
+- **`position: absolute` is ignored.** A folio cannot be pinned to the bottom of
+  the page; the language pages place it by giving the content above it a fixed
+  height, which also keeps it at the same spot on all nineteen.
+- **A cell cannot shrink to its text without a cost.** The only layout mPDF
+  offers is a rule cell at `width: 100%`, which it then reads as an overflow and
+  answers by shrinking the *whole table's type* — so "Signature" printed a size
+  smaller than "Lieu" beside it. `Language_Pages::label_width_mm()` measures the
+  label instead and both columns get an explicit millimetre width.
+- **`white-space: nowrap` is not honoured for Arabic** in an auto-width cell:
+  mPDF set the label one character per line and pushed the page onto an extra
+  sheet. Explicit widths avoid this too.
+- **Floats do not have text flow beside them.** A floated label with a bordered
+  block as its sibling puts the rule on the next line, so a fill-in rule has to
+  be a table.
+- **An empty inline-block draws nothing** — not even its own border. The holder
+  page's exclusion rules were bordered spans and printed as bare numerals with
+  nothing to write on. Any fill-in rule is a table cell with a bottom border.
 
 ## Output
 
 | Document | Pages | Size |
 | --- | --- | --- |
-| Booklet | 24 — cover, 21 translation/reference pages, holder details, back cover | ~1.2 MB |
-| Card | 2 — front, back | ~2 MB |
+| Booklet | 24 — cover, 21 translation/reference pages, holder details, back cover | ~1.5 MB |
+| Card | 2 — front, back | ~0.65 MB |
 
-Every booklet page except the back cover (page 24, which is genuine artwork —
-world map, logos, UN emblem) is rendered as text. That took the booklet from
-12.7 MB to 1.2 MB, a 91% reduction.
+Every booklet page is rendered from text and artwork rather than a page scan,
+which took the booklet from 12.7 MB to about 1.5 MB.
 
 ## mPDF quirks worth knowing
 
