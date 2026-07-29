@@ -106,6 +106,14 @@ final class Booklet_Document extends Document {
 		// languages are resolved once and shared rather than embedded twice.
 		$context['languages'] = $this->languages();
 
+		/*
+		 * Cropped square before the engine sees it: mPDF ignores `height` on an
+		 * image and `object-fit` entirely, drawing it at the declared width and
+		 * whatever height its own proportions give. A portrait upload was printing
+		 * two-thirds again as tall as its frame.
+		 */
+		$context['photo'] = $this->images->embed( $this->data->passport_photo(), false, 1.0 );
+
 		$context['interior_pages'] = $this->describe_pages( Artwork::interior_pages( $this ) );
 		$context['closing_pages']  = $this->describe_pages( Artwork::closing_pages( $this ) );
 		$context['seal']           = $this->images->embed( Artwork::seal( true ) );

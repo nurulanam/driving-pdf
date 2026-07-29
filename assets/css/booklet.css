@@ -215,11 +215,14 @@
 	margin: 0 auto;
 }
 
-/* Square, so a portrait upload is not stretched to a passport ratio. */
+/**
+ * Square. The cropping is done by Booklet_Document before the engine sees the
+ * file — mPDF ignores both `object-fit` and `height` on an image, drawing it at
+ * the declared width and whatever height its own proportions give — so only the
+ * width is set here.
+ */
 .idta-holder__portrait {
 	width: 40mm;
-	height: 40mm;
-	object-fit: cover;
 }
 
 /**

@@ -64,6 +64,15 @@ final class Fonts {
 				'useOTL'     => 255,
 				'useKashida' => 75,
 			),
+			// The card face, matching the artwork's own condensed grotesque more
+			// closely than anything else bundled. Apache-2.0; see
+			// licenses/RobotoCondensed-LICENSE.txt. Only the two weights the card
+			// uses are registered.
+			'robotocondensed' => array(
+				'R'      => 'RobotoCondensed-Regular.ttf',
+				'B'      => 'RobotoCondensed-Bold.ttf',
+				'useOTL' => 255,
+			),
 			// Arabic (page 5).
 			'xbriyaz'       => array(
 				'R'          => 'XB Riyaz.ttf',

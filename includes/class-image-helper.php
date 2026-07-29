@@ -70,19 +70,21 @@ final class Image_Helper {
 	 * the engine never makes its own outbound request, because remote assets
 	 * have already been downloaded to the cache directory.
 	 *
-	 * @param string $source    Absolute URL, site-relative path or local path.
-	 * @param bool   $grayscale Whether to desaturate the image.
+	 * @param string     $source    Absolute URL, site-relative path or local path.
+	 * @param bool       $grayscale Whether to desaturate the image.
+	 * @param float|null $aspect    Width divided by height to crop the image to,
+	 *                              or null to leave its proportions alone.
 	 *
 	 * @return string Local absolute path, or an empty string when unavailable.
 	 */
-	public function embed( string $source, bool $grayscale = false ): string {
+	public function embed( string $source, bool $grayscale = false, ?float $aspect = null ): string {
 		$source = trim( $source );
 
 		if ( '' === $source ) {
 			return '';
 		}
 
-		$memo_key = ( $grayscale ? 'gp:' : 'cp:' ) . $source;
+		$memo_key = ( $grayscale ? 'gp:' : 'cp:' ) . ( null !== $aspect ? $aspect . ':' : '' ) . $source;
 
 		if ( isset( $this->memo[ $memo_key ] ) ) {
 			return $this->memo[ $memo_key ];
@@ -96,6 +98,10 @@ final class Image_Helper {
 
 		if ( $grayscale ) {
 			$path = $this->grayscale( $path );
+		}
+
+		if ( null !== $aspect && $aspect > 0.0 ) {
+			$path = $this->crop_to_aspect( $path, $aspect );
 		}
 
 		// Reject anything the engine could not read anyway.
@@ -418,6 +424,114 @@ final class Image_Helper {
 		};
 
 		imagedestroy( $image );
+
+		return $saved && is_file( $target ) ? $target : $path;
+	}
+
+	/**
+	 * Centre-crop an image to a given width-to-height ratio.
+	 *
+	 * This is `object-fit: cover`, done before the engine sees the file, because
+	 * mPDF has neither: it ignores `object-fit`, and it ignores `height` on an
+	 * `<img>` altogether — an image is drawn at the declared width and whatever
+	 * height its own proportions dictate. A portrait upload is therefore as tall
+	 * as it likes, and on a card that pushed the signature 3mm down the face.
+	 *
+	 * Returns the original path when GD is unavailable, the format is unsupported,
+	 * or the image is already the right shape, so a missing extension degrades to
+	 * an uncropped image rather than to no image.
+	 *
+	 * @param string $path   Local path.
+	 * @param float  $aspect Target width divided by height.
+	 *
+	 * @return string
+	 */
+	public function crop_to_aspect( string $path, float $aspect ): string {
+		if ( $aspect <= 0.0 || ! function_exists( 'imagecreatetruecolor' ) ) {
+			return $path;
+		}
+
+		$info = wp_getimagesize( $path );
+
+		if ( ! is_array( $info ) || ! isset( $info['mime'] ) || empty( $info[0] ) || empty( $info[1] ) ) {
+			return $path;
+		}
+
+		$width  = (int) $info[0];
+		$height = (int) $info[1];
+
+		// Already within a pixel of the wanted shape; nothing to gain.
+		if ( abs( ( $width / $height ) - $aspect ) < 0.005 ) {
+			return $path;
+		}
+
+		$suffix = '-crop' . str_replace( '.', '', (string) round( $aspect, 4 ) );
+		$target = preg_replace( '/(\.[a-z0-9]+)$/i', $suffix . '$1', $path );
+
+		if ( ! is_string( $target ) || $target === $path ) {
+			return $path;
+		}
+
+		if ( is_file( $target ) ) {
+			return $target;
+		}
+
+		$source = match ( $info['mime'] ) {
+			'image/jpeg' => function_exists( 'imagecreatefromjpeg' ) ? imagecreatefromjpeg( $path ) : false,
+			'image/png'  => function_exists( 'imagecreatefrompng' ) ? imagecreatefrompng( $path ) : false,
+			'image/webp' => function_exists( 'imagecreatefromwebp' ) ? imagecreatefromwebp( $path ) : false,
+			default      => false,
+		};
+
+		if ( ! $source instanceof \GdImage ) {
+			return $path;
+		}
+
+		// Take the largest centred rectangle of the wanted shape.
+		if ( ( $width / $height ) > $aspect ) {
+			$crop_h = $height;
+			$crop_w = (int) round( $height * $aspect );
+		} else {
+			$crop_w = $width;
+			$crop_h = (int) round( $width / $aspect );
+		}
+
+		$crop_w = max( 1, min( $crop_w, $width ) );
+		$crop_h = max( 1, min( $crop_h, $height ) );
+
+		$canvas = imagecreatetruecolor( $crop_w, $crop_h );
+
+		if ( ! $canvas instanceof \GdImage ) {
+			imagedestroy( $source );
+
+			return $path;
+		}
+
+		if ( 'image/png' === $info['mime'] || 'image/webp' === $info['mime'] ) {
+			imagealphablending( $canvas, false );
+			imagesavealpha( $canvas, true );
+		}
+
+		$copied = imagecopy(
+			$canvas,
+			$source,
+			0,
+			0,
+			(int) round( ( $width - $crop_w ) / 2 ),
+			(int) round( ( $height - $crop_h ) / 2 ),
+			$crop_w,
+			$crop_h
+		);
+
+		$saved = $copied && match ( $info['mime'] ) {
+			'image/jpeg' => imagejpeg( $canvas, $target, 92 ),
+			'image/png'  => imagepng( $canvas, $target ),
+			'image/webp' => function_exists( 'imagewebp' ) && imagewebp( $canvas, $target ),
+			default      => false,
+		};
+
+		imagedestroy( $source );
+		imagedestroy( $canvas );
 
 		return $saved && is_file( $target ) ? $target : $path;
 	}

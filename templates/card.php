@@ -28,102 +28,87 @@ $back_style = '' !== $context['back_background']
 	? sprintf( ' style="background-image: url(\'%s\');"', esc_attr( $context['back_background'] ) )
 	: '';
 
-/**
- * Numbered fields, matching the layout of the printed card.
- *
- * @var array<int,array{num:string,value:string}> $left_fields
+/*
+ * The eight numbered fields, prepared by Card_Document, print in two columns of
+ * four: 1-4 on the left, 5-8 on the right. Each field is two table rows — the
+ * label, then the value — so the row heights carry the artwork's vertical rhythm
+ * rather than margins, which mPDF ignores inside a cell.
  */
-$left_fields = array(
-	array(
-		'num'   => '1.',
-		'value' => $context['last_name'],
-	),
-	array(
-		'num'   => '2.',
-		'value' => $context['given_names'],
-	),
-	array(
-		'num'   => '3.',
-		'value' => $context['birth_country'],
-	),
-	array(
-		'num'   => '4.',
-		'value' => $context['date_of_birth'],
-	),
-	array(
-		'num'   => '5.',
-		'value' => $context['residence'],
-	),
-);
+$card_fields = (array) ( $context['card_fields'] ?? array() );
+$card_left   = array_slice( $card_fields, 0, 4 );
+$card_right  = array_slice( $card_fields, 4, 4 );
 
-$right_fields = array(
-	array(
-		'num'   => '7.',
-		'value' => $context['issue_date'],
-	),
-	array(
-		'num'   => '8.',
-		'value' => $context['expiry_date'],
-	),
-	array(
-		'num'   => '9.',
-		'value' => $context['card_number'],
-	),
-);
+/**
+ * Emit the label and value cells for one field, or empty cells when a column
+ * runs out of fields.
+ *
+ * @param array<string,mixed>|null $field Field definition.
+ * @param string                   $part  'label' or 'value'.
+ * @param string                   $extra Extra class for the cell.
+ */
+$card_cell = static function ( ?array $field, string $part, string $extra = '' ): void {
+	if ( null === $field ) {
+		printf( '<td class="%s"></td>', esc_attr( trim( 'idta-card__' . $part . ' ' . $extra ) ) );
+
+		return;
+	}
+
+	if ( 'label' === $part ) {
+		printf(
+			'<td class="%s">%s %s</td>',
+			esc_attr( trim( 'idta-card__label ' . $extra ) ),
+			esc_html( (string) $field['num'] ),
+			esc_html( (string) $field['label'] )
+		);
+
+		return;
+	}
+
+	// The size is per field: a long name is stepped down so it cannot run into
+	// the next column. See Card_Document::fit_pt().
+	$classes = 'idta-card__value ' . $extra;
+
+	if ( ! empty( $field['wrap'] ) ) {
+		$classes .= ' idta-card__value--wrap';
+	}
+
+	printf(
+		'<td class="%s" style="font-size: %spt;">%s</td>',
+		esc_attr( trim( $classes ) ),
+		esc_attr( (string) $field['pt'] ),
+		esc_html( (string) $field['value'] )
+	);
+};
 ?>
 <div class="idta-card idta-card--front"<?php echo $front_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built above with esc_attr(). ?>>
 
-	<div class="idta-card__disclaimer">
-		<?php esc_html_e( 'This document is a translation of the holder\'s driver\'s licence and confers no legal privileges.', 'idta-pdf' ); ?>
-	</div>
-
+	<?php
+	/*
+	 * The artwork already carries the whole header — logo, the title in six
+	 * languages, the holographic seal and the guilloche divider — so nothing is
+	 * drawn above this point; the padding on .idta-card--front is what clears it.
+	 */
+	?>
 	<div class="idta-card__body">
 
+		<?php
+		/*
+		 * Portrait and signature each sit in their own block, and the size goes on
+		 * the image via its own class. Two bare `img` siblings share a line box,
+		 * and mPDF then scales them to the float's width and ignores the width it
+		 * was given; a descendant selector (`.wrapper img`) is ignored outright.
+		 */
+		?>
 		<div class="idta-card__photo">
-			<?php if ( '' !== $context['photo'] ) : ?>
-				<img class="idta-card__portrait" src="<?php echo esc_attr( $context['photo'] ); ?>" alt="">
-			<?php endif; ?>
-
-			<?php if ( '' !== $context['stamp'] ) : ?>
-				<img class="idta-card__stamp" src="<?php echo esc_attr( $context['stamp'] ); ?>" alt="">
-			<?php endif; ?>
-
-			<div class="idta-card__signature">
-				<?php if ( '' !== $context['signature'] ) : ?>
-					<img src="<?php echo esc_attr( $context['signature'] ); ?>" alt="">
-				<?php else : ?>
-					<span class="idta-card__signature-missing">&nbsp;</span>
+			<div>
+				<?php if ( '' !== $context['photo'] ) : ?>
+					<img class="idta-card__portrait" src="<?php echo esc_attr( $context['photo'] ); ?>" alt="">
 				<?php endif; ?>
 			</div>
-		</div>
-
-		<div class="idta-card__details">
-
-			<table class="idta-card__fields">
-				<?php foreach ( $left_fields as $index => $field ) : ?>
-					<tr>
-						<td class="idta-card__field">
-							<span class="idta-card__num"><?php echo esc_html( $field['num'] ); ?></span>
-							<span class="idta-card__value"><?php echo esc_html( $field['value'] ); ?></span>
-						</td>
-						<td class="idta-card__field idta-card__field--right">
-							<?php if ( isset( $right_fields[ $index ] ) ) : ?>
-								<span class="idta-card__num"><?php echo esc_html( $right_fields[ $index ]['num'] ); ?></span>
-								<span class="idta-card__value idta-card__value--tight"><?php echo esc_html( $right_fields[ $index ]['value'] ); ?></span>
-							<?php endif; ?>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			</table>
-
-			<div class="idta-card__class">
-				<span class="idta-card__num"><?php esc_html_e( 'CLASS.', 'idta-pdf' ); ?></span>
-				<span
-					class="idta-card__class-values"
-					style="font-size: <?php echo esc_attr( (string) $context['category_font_pt'] ); ?>pt;"
-				>
-					<?php echo esc_html( implode( ', ', $context['categories'] ) ); ?>
-				</span>
+			<div>
+				<?php if ( '' !== $context['signature'] ) : ?>
+					<img class="idta-card__signature" src="<?php echo esc_attr( $context['signature'] ); ?>" alt="">
+				<?php endif; ?>
 			</div>
 		</div>
 
@@ -137,11 +122,26 @@ $right_fields = array(
 			<?php endif; ?>
 		</div>
 
-		<div class="idta-clear"></div>
-	</div>
+		<div class="idta-card__details">
+			<table class="idta-card__fields">
+				<?php foreach ( $card_left as $row => $field ) : ?>
+					<tr>
+						<?php
+						$card_cell( $field, 'label', 'idta-card__cell--left' );
+						$card_cell( $card_right[ $row ] ?? null, 'label', 'idta-card__cell--right' );
+						?>
+					</tr>
+					<tr>
+						<?php
+						$card_cell( $field, 'value', 'idta-card__cell--left' );
+						$card_cell( $card_right[ $row ] ?? null, 'value', 'idta-card__cell--right' );
+						?>
+					</tr>
+				<?php endforeach; ?>
+			</table>
+		</div>
 
-	<div class="idta-card__footer">
-		<?php esc_html_e( 'To be presented with the original driver\'s licence', 'idta-pdf' ); ?>
+		<div class="idta-clear"></div>
 	</div>
 </div>
 

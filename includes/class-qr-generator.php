@@ -202,7 +202,17 @@ final class QR_Generator {
 	}
 
 	/**
-	 * Margin round-block-size mode, in whichever form the library wants.
+	 * Round-block-size mode, in whichever form the library wants.
+	 *
+	 * Shrink, not Margin. Both keep the modules on whole pixels, but Margin holds
+	 * the requested pixel size and pads the difference as a border — 7.7% of the
+	 * image on each side, varying with the module count, so the code drew about
+	 * 16% smaller than the box it was given and by an amount that changed with the
+	 * length of the encoded URL. Shrink instead trims the image to whole modules,
+	 * making the file all code: the size given in CSS is the size that prints.
+	 *
+	 * That leaves no quiet zone inside the image. The pale card and page around it
+	 * supply one, which is how the printed artwork does it too.
 	 *
 	 * @return mixed
 	 */
@@ -210,10 +220,10 @@ final class QR_Generator {
 		$enum = 'Endroid\\QrCode\\RoundBlockSizeMode';
 
 		if ( enum_exists( $enum ) ) {
-			return constant( $enum . '::Margin' );
+			return constant( $enum . '::Shrink' );
 		}
 
-		$class = 'Endroid\\QrCode\\RoundBlockSizeMode\\RoundBlockSizeModeMargin';
+		$class = 'Endroid\\QrCode\\RoundBlockSizeMode\\RoundBlockSizeModeShrink';
 
 		return class_exists( $class ) ? new $class() : null;
 	}

@@ -4,6 +4,11 @@
  * Loaded after the base stylesheet, so the point sizes here intentionally
  * override the 10pt default — a credit-card face cannot carry 10pt body copy.
  * Operator CSS is loaded after this file and overrides it in turn.
+ *
+ * Every measurement below was taken from `assets/img/front-full.jpg`, the printed
+ * design, by differencing it against the blank `white-front.jpg` artwork and
+ * measuring the pixels that differ. The artwork is 1597 x 1009 px for an
+ * 85.6 x 53.98 mm card, so 18.66 px = 1 mm.
  */
 
 .idta-card {
@@ -16,147 +21,152 @@
 	background-position: center center;
 	/**
 	 * mPDF ignores `background-size`, drawing the artwork at its natural pixel
-	 * size and cropping it to the top-left. Its own `background-image-resize`
-	 * property is what actually scales a background; 5 stretches the artwork to
-	 * fit both dimensions, whether it is larger or smaller than the card.
+	 * size and cropping it to the top-left; its own `background-image-resize` is
+	 * what actually scales a background.
+	 *
+	 * 6, not 5. 5 fits the height and keeps the aspect ratio, and the artwork is
+	 * a whisker wider in proportion than the card — so it came out 0.16mm narrow
+	 * and, centred, left a hairline of bare card down each edge. 6 scales width
+	 * and height independently to fill the face exactly.
 	 */
-	background-image-resize: 5;
-	text-transform: uppercase;
+	background-image-resize: 6;
+	font-family: robotocondensed;
+	color: #071f3d;
 }
 
 .idta-card--back {
 	page-break-before: always;
 }
 
-/* Reserve the artwork's header band before content starts. */
+/**
+ * Clears the header the artwork already carries — logo, the title in six
+ * languages, the seal and the guilloche divider. The first field label prints
+ * 27.1mm down the card; this padding plus the leading above the first line puts
+ * it there.
+ */
 .idta-card--front {
-	padding-top: 17mm;
+	padding-top: 27.34mm;
 }
 
-.idta-card__disclaimer {
-	font-size: 4.2pt;
-	font-weight: bold;
-	line-height: 1.15;
-	text-align: right;
-	padding: 0 2mm 0.6mm 2mm;
-	text-transform: none;
-}
-
-.idta-card__body {
-	padding: 0 2mm;
-}
-
-/* ---- Portrait and signature column ---- */
+/* ---- Portrait and signature, 4.8mm from the left edge ---- */
 
 .idta-card__photo {
 	float: left;
-	width: 18mm;
+	width: 18.2mm;
 }
 
+/* An image's top sits on the block's top edge; text drops by its own leading, so
+   the portrait needs its own offset to line up with the first field label. */
 .idta-card__portrait {
-	width: 17mm;
-	height: 21mm;
-	object-fit: cover;
+	width: 13.45mm;
+	margin: 1.08mm 0 0 4.77mm;
 }
 
-.idta-card__stamp {
-	width: 8mm;
-	margin-top: -8mm;
-	margin-left: 10mm;
-}
-
+/**
+ * Class on the image itself: mPDF ignores a descendant `img` selector.
+ *
+ * Only the width is set. mPDF ignores `height` on an image, and a signature is
+ * the one thing here that must not be cropped to make it obey, so its height
+ * follows from its own proportions.
+ */
 .idta-card__signature {
-	width: 17mm;
-	text-align: center;
-	padding-top: 0.5mm;
+	width: 9.38mm;
+	margin: 1.01mm 0 0 6.86mm;
 }
 
-.idta-card__signature img {
-	width: 15mm;
-	height: 5mm;
-}
-
-.idta-card__signature-missing {
-	font-size: 5pt;
-}
-
-/* ---- Numbered field block ---- */
-
-.idta-card__details {
-	float: left;
-	width: 44mm;
-	padding-left: 1.5mm;
-}
-
-.idta-card__fields {
-	width: 100%;
-}
-
-.idta-card__field {
-	font-size: 5.4pt;
-	font-weight: bold;
-	line-height: 1.25;
-	padding: 0 0 0.4mm 0;
-	vertical-align: top;
-	white-space: nowrap;
-}
-
-.idta-card__field--right {
-	text-align: left;
-	padding-left: 1mm;
-}
-
-.idta-card__num {
-	color: #3b016f;
-	font-weight: bold;
-	font-size: 5.4pt;
-	padding-right: 0.8mm;
-}
-
-.idta-card__value {
-	font-size: 5.4pt;
-	font-weight: bold;
-}
-
-/* Permit numbers are long; give them a little more room. */
-.idta-card__value--tight {
-	font-size: 5pt;
-}
-
-.idta-card__class {
-	padding-top: 0.6mm;
-}
-
-.idta-card__class-values {
-	font-weight: bold;
-	line-height: 1;
-}
-
-/* ---- Ghost portrait and QR column ---- */
+/* ---- Duplicate portrait and QR, against the right edge ---- */
 
 .idta-card__aside {
 	float: right;
-	width: 17mm;
-	text-align: right;
+	width: 15.4mm;
 }
 
 .idta-card__ghost {
-	width: 9mm;
-	height: 11mm;
-	object-fit: cover;
+	width: 7.13mm;
+	margin: 0.1mm 0 0 1mm;
 }
 
 .idta-card__qr {
-	width: 15mm;
-	height: 15mm;
-	margin-top: 0.5mm;
+	width: 9.2mm;
+	height: 9.2mm;
+	margin-top: 0.97mm;
 }
 
-.idta-card__footer {
-	font-size: 3.8pt;
-	text-align: right;
-	padding: 0 2mm;
-	text-transform: none;
+/* ---- The eight numbered fields ---- */
+
+/**
+ * Two columns of four. The left column's labels start 20.2mm from the card edge
+ * and the right column's at 46.9mm, which is where these widths come from once
+ * the portrait float (18.2mm) and this block's own left margin are accounted for.
+ */
+.idta-card__details {
+	float: left;
+	width: 49.9mm;
+	margin-left: 2.05mm;
+}
+
+.idta-card__fields {
+	width: 49.9mm;
+	border-collapse: collapse;
+}
+
+/**
+ * The label row is 2.1mm tall and the value row 3.7mm, giving the artwork's
+ * 5.8mm pitch from one field to the next.
+ *
+ * Labels print at 4.2pt: Roboto Condensed is close to the artwork's own face, so
+ * unlike the wider fonts mPDF ships this needed almost no reduction to fit the
+ * longest bilingual label in its column.
+ */
+/* font-family and color are restated on the cells: mPDF inherits neither into a
+   `td`. Without font-family the fields fall back to the body's wider face and
+   the bilingual labels run into the next column; without color they fall back
+   to mPDF's default black rather than the card's navy. */
+.idta-card__label {
+	height: 1.98mm;
+	font-family: robotocondensed;
+	color: #071f3d;
+	font-size: 4.2pt;
+	line-height: 1;
+	vertical-align: top;
+	padding: 0;
+	white-space: nowrap;
+}
+
+.idta-card__value {
+	height: 3.81mm;
+	font-family: robotocondensed;
+	color: #071f3d;
+	font-weight: bold;
+	line-height: 1.08;
+	vertical-align: top;
+	padding: 0 0 0 1.14mm;
+}
+
+/* The authority is the one field set over two lines, and the only one left in
+   mixed case. Card_Document upper-cases the rest. */
+.idta-card__value--wrap {
+	height: auto;
+	white-space: normal;
+}
+
+/**
+ * Column widths, not padding. The left column is 26.6mm wide because the right
+ * column's labels start 46.9mm from the card edge and the left column's at
+ * 20.2mm; a padding-based offset instead let mPDF's auto table layout shrink the
+ * left column to its content and the two columns of labels ran together.
+ */
+.idta-card__cell--left {
+	width: 26.64mm;
+}
+
+.idta-card__cell--right {
+	width: 23.26mm;
+	padding-left: 0;
+}
+
+.idta-card__value.idta-card__cell--right {
+	padding-left: 1.34mm;
 }
 
 /* ---- Fallback back face, used only when no artwork is configured ---- */
@@ -167,15 +177,16 @@
 }
 
 .idta-card__back-label {
+	color: #071f3d;
 	font-size: 5pt;
 	font-weight: bold;
-	color: #3b016f;
 	padding: 0.6mm 2mm 0.6mm 0;
 	vertical-align: top;
 	white-space: nowrap;
 }
 
 .idta-card__back-value {
+	color: #071f3d;
 	font-size: 5pt;
 	padding: 0.6mm 0;
 	vertical-align: top;
@@ -184,7 +195,5 @@
 .idta-card__back-qr {
 	width: 14mm;
 	height: 14mm;
-	position: absolute;
-	right: 4mm;
-	bottom: 4mm;
+	margin: 2mm 0 0 4mm;
 }
