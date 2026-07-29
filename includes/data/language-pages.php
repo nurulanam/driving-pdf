@@ -651,8 +651,11 @@ return array(
 		'code'        => 'am',
 		'label'       => 'አማርኛ',
 		'folio'       => '10',
-		'font'        => 'abyssinicasil',
-		'weight'      => 'bold',
+		// FreeSerif reads as a cleaner book face for Ethiopic than Abyssinica
+		// SIL's heavier, rounder default; freeserif's bold variant (unlike its
+		// regular) has no Ethiopic glyphs at all, so this page must stay at the
+		// default normal weight rather than asking for bold like the CJK pages.
+		'font'        => 'freeserif',
 		'flag'        => array(),
 		'lead_driver' => 'የአሽከርካሪ መረጃ:',
 		'lead_valid'  => 'ፈቃዱ የሚሰራባቸው ተሽከርካሪዎች:',

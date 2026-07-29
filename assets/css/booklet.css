@@ -308,7 +308,7 @@
  */
 .idta-exclusions__numeral,
 .idta-exclusions__line {
-	height: 5.5mm;
+	height: 8mm;
 	vertical-align: bottom;
 }
 
@@ -818,11 +818,12 @@
 }
 
 /**
- * Pulled up by the page's own 8mm top padding so the map sits flush with the
- * page edge, as the scan prints it, rather than starting 8mm below it.
+ * The horizontal negative margin cancels the page's own 24mm side padding so
+ * the map can span the full page width; the positive top margin is clear space
+ * above it, rather than the map sitting flush with the page edge.
  */
 .back__map {
-	margin: -8mm -24mm 0 -24mm;
+	margin: 14mm -24mm 0 -24mm;
 }
 
 .back__map img {

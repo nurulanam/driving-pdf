@@ -25,8 +25,7 @@ defined( 'ABSPATH' ) || exit;
  *   xbriyaz        Arabic
  *   sun-exta       Chinese, Japanese
  *   unbatang       Korean
- *   abyssinicasil  Amharic
- *   freeserif      Devanagari (Hindi)
+ *   freeserif      Devanagari (Hindi), Amharic
  *   garuda         Thai
  *
  * Fonts registered through `idta_pdf_font_data` count too, so a closer match

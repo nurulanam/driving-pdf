@@ -81,12 +81,14 @@ final class Fonts {
 			'unbatang'      => array(
 				'R' => 'UnBatang_0613.ttf',
 			),
-			// Amharic (page 13).
+			// Ethiopic. Not the default for Amharic (page 13) — its heavier,
+			// rounder strokes read less cleanly than freeserif's — but kept
+			// available for a custom page or a site that prefers it.
 			'abyssinicasil' => array(
 				'R'      => 'Abyssinica_SIL.ttf',
 				'useOTL' => 255,
 			),
-			// Devanagari, for Hindi (page 16).
+			// Devanagari (Hindi, page 16) and Ethiopic (Amharic, page 13).
 			'freeserif'     => array(
 				'R'          => 'FreeSerif.ttf',
 				'B'          => 'FreeSerifBold.ttf',

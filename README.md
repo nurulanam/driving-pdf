@@ -133,9 +133,12 @@ seal, place, date, signature, footnote).
 | `xbriyaz` | Arabic |
 | `sun-exta` | Chinese, Japanese |
 | `unbatang` | Korean |
-| `abyssinicasil` | Amharic |
-| `freeserif` | Devanagari (Hindi) |
+| `freeserif` | Devanagari (Hindi), Amharic |
 | `garuda` | Thai |
+
+`abyssinicasil` (Ethiopic) is also bundled and registered, but isn't the default
+for Amharic — its strokes read heavier and rounder than freeserif's. Available
+for a custom page via `idta_pdf_language_pages` if preferred.
 
 `weight => 'bold'` thickens the face. mPDF's bundled CJK and Ethiopic fonts ship
 in one hairline weight that prints far lighter than the scans, so those pages ask
