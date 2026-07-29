@@ -118,6 +118,22 @@ final class Plugin {
 		add_action( 'woocommerce_new_order', array( $this, 'schedule_generation' ), 20, 1 );
 		add_action( 'woocommerce_payment_complete', array( $this, 'schedule_generation' ), 20, 1 );
 
+		/*
+		 * Broadest fallback: every order save, whatever wrote it. The hooks above
+		 * only fire at specific points in WooCommerce's own checkout and status
+		 * lifecycle; a checkout-fields plugin, a custom endpoint, or an admin
+		 * screen can write the _idp_* meta and call $order->save() at any other
+		 * time, and none of those points would otherwise get a second look. This
+		 * fires on both HPOS and legacy post-based orders, since it comes from
+		 * WC_Order itself rather than a specific data store.
+		 *
+		 * schedule_generation() re-derives the order ID from the object, checks
+		 * Order_Data::has_data() and is_generated()/is_queued() before doing
+		 * anything, so a plain status update on an already-complete order is a
+		 * cheap no-op rather than a second render.
+		 */
+		add_action( 'woocommerce_after_order_object_save', array( $this, 'schedule_generation_for_order' ), 20, 1 );
+
 		foreach ( $this->settings->trigger_statuses() as $status ) {
 			add_action( 'woocommerce_order_status_' . $status, array( $this, 'schedule_generation' ), 20, 1 );
 		}
@@ -151,6 +167,18 @@ final class Plugin {
 
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::ASYNC_HOOK );
+		}
+	}
+
+	/**
+	 * Queue document generation from a `woocommerce_after_order_object_save`
+	 * callback, which passes the order object rather than its ID.
+	 *
+	 * @param \WC_Order $order Order object.
+	 */
+	public function schedule_generation_for_order( $order ): void {
+		if ( $order instanceof \WC_Order ) {
+			$this->schedule_generation( $order->get_id() );
 		}
 	}
 
@@ -223,10 +251,45 @@ final class Plugin {
 			return;
 		}
 
+		$this->raise_limits();
+
 		try {
 			$this->generator->generate( $order );
 		} catch ( \Throwable $exception ) {
 			$this->generator->log_failure( $order, $exception );
+		}
+	}
+
+	/**
+	 * Give the worker the headroom the booklet needs.
+	 *
+	 * The booklet is by far the heavier document — 24 pages, ten embedded font
+	 * subsets and the flag artwork, against the card's two pages — so it is the
+	 * one that runs out of memory or time first. This matters because it runs in
+	 * a WP-Cron or Action Scheduler request, which gets PHP's bare defaults, while
+	 * the manual button on the order screen runs in wp-admin, where WordPress has
+	 * already raised the memory limit to WP_MAX_MEMORY_LIMIT. That difference is
+	 * enough to make the booklet fail on a schedule and succeed on a click.
+	 *
+	 * Both calls only ever raise a limit, and both are filterable — the memory one
+	 * through `idta_pdf_memory_limit`, the time budget through
+	 * `idta_pdf_time_limit`. A host that forbids either is left as it is.
+	 */
+	private function raise_limits(): void {
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'idta_pdf' );
+		}
+
+		/**
+		 * Filters the seconds allowed for one generation run.
+		 *
+		 * @param int $seconds Time limit. Zero leaves the limit untouched.
+		 */
+		$seconds = (int) apply_filters( 'idta_pdf_time_limit', 300 );
+
+		if ( $seconds > 0 && function_exists( 'set_time_limit' ) ) {
+			// Fails silently where it is disabled, which is the intended outcome.
+			@set_time_limit( $seconds ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		}
 	}
 

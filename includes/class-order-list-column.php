@@ -12,9 +12,10 @@ namespace IDTA\PDF;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds a trailing "IDP Documents" column with per-document download or
- * generate buttons, on both the legacy post-based orders screen and the
- * High-Performance Order Storage orders screen.
+ * Adds a trailing "PDFs" column with per-document download or generate buttons,
+ * a regenerate action, and the last generation error when there is one — on both
+ * the legacy post-based orders screen and the High-Performance Order Storage
+ * orders screen.
  */
 final class Order_List_Column {
 
@@ -79,7 +80,7 @@ final class Order_List_Column {
 	public function add_column( $columns ): array {
 		$columns = is_array( $columns ) ? $columns : array();
 
-		$columns[ self::COLUMN ] = __( 'IDP Documents', 'idta-pdf' );
+		$columns[ self::COLUMN ] = __( 'PDFs', 'idta-pdf' );
 
 		return $columns;
 	}
@@ -145,14 +146,15 @@ final class Order_List_Column {
 			'card'    => __( 'Card', 'idta-pdf' ),
 		);
 
-		echo '<div class="idta-pdf-column" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">';
+		// One row, wrapping only if the column is too narrow for it.
+		echo '<div class="idta-pdf-column" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">';
 
 		foreach ( $requested as $slug ) {
 			$label = $labels[ $slug ] ?? $slug;
 
 			if ( isset( $documents[ $slug ] ) ) {
 				printf(
-					'<a class="button button-small" href="%1$s" style="width:100%%;text-align:center;">%2$s</a>',
+					'<a class="button button-small" href="%1$s">%2$s</a>',
 					esc_url( $this->downloads->admin_url( $order, $slug ) ),
 					esc_html( $label )
 				);
@@ -161,13 +163,60 @@ final class Order_List_Column {
 			}
 
 			printf(
-				'<a class="button button-small button-secondary" href="%1$s" style="width:100%%;text-align:center;">%2$s</a>',
+				'<a class="button button-small button-secondary" href="%1$s">%2$s</a>',
 				esc_url( $this->order_admin->generate_one_url( $order, $slug ) ),
 				/* translators: %s: document label, e.g. "Permit" or "Card". */
 				esc_html( sprintf( __( 'Generate %s', 'idta-pdf' ), $label ) )
 			);
 		}
 
+		$this->render_regenerate( $order );
+		$this->render_error( $order );
+
 		echo '</div>';
+	}
+
+	/**
+	 * Icon-only regenerate button.
+	 *
+	 * Dashicons are always present in wp-admin, so no asset needs enqueueing. The
+	 * label lives in the title and aria-label rather than as text, since the
+	 * column has room for the two document buttons and little else.
+	 *
+	 * @param \WC_Order $order Order object.
+	 */
+	private function render_regenerate( \WC_Order $order ): void {
+		printf(
+			'<a class="button button-small" href="%1$s" title="%2$s" aria-label="%2$s"'
+			. ' style="padding:0 5px;line-height:24px;">'
+			. '<span class="dashicons dashicons-update" style="font-size:16px;width:16px;height:16px;'
+			. 'line-height:24px;vertical-align:top;"></span></a>',
+			esc_url( $this->order_admin->regenerate_url( $order ) ),
+			esc_attr__( 'Regenerate PDFs', 'idta-pdf' )
+		);
+	}
+
+	/**
+	 * Warning icon carrying the last generation error, when one was recorded.
+	 *
+	 * Generator::generate() keeps going when a single document fails, so an order
+	 * can legitimately end up with one PDF and not the other. Without this the
+	 * only clue was the panel on the order screen, which is a click away from
+	 * where the missing button is noticed.
+	 *
+	 * @param \WC_Order $order Order object.
+	 */
+	private function render_error( \WC_Order $order ): void {
+		$error = $order->get_meta( Generator::ERROR_META, true );
+
+		if ( ! is_string( $error ) || '' === trim( $error ) ) {
+			return;
+		}
+
+		printf(
+			'<span class="dashicons dashicons-warning" title="%1$s"'
+			. ' style="color:#b32d2e;font-size:18px;width:18px;height:18px;cursor:help;"></span>',
+			esc_attr( $error )
+		);
 	}
 }

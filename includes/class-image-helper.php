@@ -542,30 +542,62 @@ final class Image_Helper {
 	 * Sniffs content rather than trusting the URL extension or the remote
 	 * Content-Type header.
 	 *
+	 * Done entirely in memory. This used to write the bytes to a temp file from
+	 * wp_tempnam() and call wp_getimagesize() on it — but wp_tempnam() lives in
+	 * wp-admin/includes/file.php, which WordPress does not load on the frontend.
+	 * Checkout *is* the frontend, so every remote asset made automatic generation
+	 * die with "Call to undefined function wp_tempnam()", while the identical code
+	 * succeeded from the order screen because admin has that file loaded. Nothing
+	 * here may depend on an admin-only function.
+	 *
 	 * @param string $bytes Raw file contents.
 	 *
 	 * @return string Extension without a dot, or an empty string.
 	 */
 	private function extension_from_bytes( string $bytes ): string {
-		$temp = wp_tempnam( 'idta-pdf-sniff' );
+		$extension = $this->extension_from_signature( $bytes );
 
-		if ( ! $temp ) {
+		if ( '' === $extension || ! function_exists( 'getimagesizefromstring' ) ) {
+			return $extension;
+		}
+
+		// The signature only proves how the bytes start. This confirms they
+		// actually decode, so a file merely wearing an image header is rejected.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- warns on malformed data, which is precisely what is being tested for.
+		$info = @getimagesizefromstring( $bytes );
+
+		if ( ! is_array( $info ) || ! isset( $info['mime'] ) ) {
 			return '';
 		}
 
-		$extension = '';
+		return self::ALLOWED_MIME[ $info['mime'] ] ?? '';
+	}
 
-		if ( $this->filesystem->put_contents( $temp, $bytes ) ) {
-			$info = wp_getimagesize( $temp );
-
-			if ( is_array( $info ) && isset( $info['mime'] ) ) {
-				$extension = self::ALLOWED_MIME[ $info['mime'] ] ?? '';
-			}
+	/**
+	 * Match the leading magic number of an accepted image format.
+	 *
+	 * @param string $bytes Raw file contents.
+	 *
+	 * @return string Extension without a dot, or an empty string.
+	 */
+	private function extension_from_signature( string $bytes ): string {
+		if ( str_starts_with( $bytes, "\xFF\xD8\xFF" ) ) {
+			return 'jpg';
 		}
 
-		wp_delete_file( $temp );
+		if ( str_starts_with( $bytes, "\x89PNG\r\n\x1A\n" ) ) {
+			return 'png';
+		}
 
-		return $extension;
+		if ( str_starts_with( $bytes, 'GIF87a' ) || str_starts_with( $bytes, 'GIF89a' ) ) {
+			return 'gif';
+		}
+
+		if ( str_starts_with( $bytes, 'RIFF' ) && 'WEBP' === substr( $bytes, 8, 4 ) ) {
+			return 'webp';
+		}
+
+		return '';
 	}
 
 	/**

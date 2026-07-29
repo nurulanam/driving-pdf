@@ -156,7 +156,18 @@ final class Filesystem {
 	}
 
 	/**
-	 * Write a file through WP_Filesystem, falling back to a direct write.
+	 * Write a file, preferring a direct write.
+	 *
+	 * The direct write comes first deliberately. Everything written here lives in
+	 * the plugin's own directory under uploads, which it created and owns, so
+	 * there is nothing for WP_Filesystem's credential handling to solve.
+	 *
+	 * The old order asked for WP_Filesystem first and, on the frontend, pulled in
+	 * wp-admin/includes/file.php to get it. That had two costs: it dragged the
+	 * admin file API into checkout requests, and — because that same file is what
+	 * defines wp_tempnam() — it made an unrelated part of the image pipeline work
+	 * or fatal depending on whether anything had written a file yet. That is why
+	 * one document generated and the other did not, and why it looked arbitrary.
 	 *
 	 * @param string $file     Absolute path.
 	 * @param string $contents File contents.
@@ -164,28 +175,28 @@ final class Filesystem {
 	 * @return bool
 	 */
 	public function put_contents( string $file, string $contents ): bool {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		if ( false !== file_put_contents( $file, $contents, LOCK_EX ) ) {
+			return true;
+		}
+
+		// A host that blocks direct writes may still offer WP_Filesystem, but only
+		// if the admin file API is already loaded. This will not load it.
 		global $wp_filesystem;
 
-		if ( ! $wp_filesystem instanceof \WP_Filesystem_Base ) {
-			$bootstrap = ABSPATH . 'wp-admin/includes/file.php';
-
-			// Front-end and cron requests do not load the admin file API.
-			if ( ! function_exists( 'WP_Filesystem' ) && is_readable( $bootstrap ) ) {
-				require_once $bootstrap;
-			}
-
-			if ( function_exists( 'WP_Filesystem' ) ) {
-				WP_Filesystem();
-			}
+		if ( ! $wp_filesystem instanceof \WP_Filesystem_Base && function_exists( 'WP_Filesystem' ) ) {
+			WP_Filesystem();
 		}
 
 		if ( $wp_filesystem instanceof \WP_Filesystem_Base ) {
-			return (bool) $wp_filesystem->put_contents( $file, $contents, FS_CHMOD_FILE );
+			return (bool) $wp_filesystem->put_contents(
+				$file,
+				$contents,
+				defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644
+			);
 		}
 
-		// Direct write fallback, used when WP_Filesystem is unavailable.
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		return false !== file_put_contents( $file, $contents, LOCK_EX );
+		return false;
 	}
 
 	/**

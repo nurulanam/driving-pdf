@@ -77,6 +77,29 @@ final class Order_Admin {
 	}
 
 	/**
+	 * Nonced URL that regenerates every document for an order.
+	 *
+	 * Public so the orders list column can offer the same action as the panel on
+	 * the order screen.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return string
+	 */
+	public function regenerate_url( \WC_Order $order ): string {
+		return wp_nonce_url(
+			add_query_arg(
+				array(
+					'action'   => 'idta_pdf_regenerate',
+					'order_id' => $order->get_id(),
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'idta-pdf-regenerate'
+		);
+	}
+
+	/**
 	 * Register the document panel on both legacy and HPOS order screens.
 	 *
 	 * @param string $screen_id Current screen ID.
@@ -161,20 +184,9 @@ final class Order_Admin {
 			);
 		}
 
-		$regenerate = wp_nonce_url(
-			add_query_arg(
-				array(
-					'action'   => 'idta_pdf_regenerate',
-					'order_id' => $order->get_id(),
-				),
-				admin_url( 'admin-post.php' )
-			),
-			'idta-pdf-regenerate'
-		);
-
 		printf(
 			'<p><a class="button button-primary" href="%1$s">%2$s</a></p>',
-			esc_url( $regenerate ),
+			esc_url( $this->regenerate_url( $order ) ),
 			esc_html__( 'Regenerate documents', 'idta-pdf' )
 		);
 	}

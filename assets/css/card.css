@@ -84,6 +84,7 @@
 .idta-card__ghost {
 	width: 7.13mm;
 	margin: 0.1mm 0 0 1mm;
+	opacity: 0.9;
 }
 
 .idta-card__qr {
