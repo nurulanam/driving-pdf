@@ -35,10 +35,42 @@ final class Order_Data {
 		'_idp_license_category'      => 'License Category',
 		'_idp_validity_years'        => 'Validity Years',
 		'_idp_format'                => 'IDP Format',
-		'_idp_passport_photo'        => 'Passport Photo Path',
-		'_idp_license_front'         => 'License Front Image Path',
-		'_idp_license_back'          => 'License Back Image Path',
-		'_idp_signature'             => 'Signature Path',
+		'_idp_assets'                => 'Assets Folder',
+	);
+
+	/**
+	 * Filename of each image within an order's asset folder.
+	 *
+	 * `_idp_assets` holds only the folder — "2026/08/01/063701-213" — because all
+	 * four uploads land in it under these same names every time. Storing the
+	 * folder once replaces the four full paths this plugin used to read, and is
+	 * the whole point of the scheme.
+	 *
+	 * @var array<string,string>
+	 */
+	public const ASSET_FILES = array(
+		'passport_photo' => 'portrait.jpg',
+		'license_front'  => 'license-front.jpg',
+		'license_back'   => 'license-back.jpg',
+		'signature'      => 'signature.png',
+	);
+
+	/**
+	 * Retired per-image meta keys, still read so existing orders keep their
+	 * images, keyed as in self::ASSET_FILES.
+	 *
+	 * Nothing writes these any more and they are not offered on the order screen.
+	 * They are read only as a fallback for orders already in the database from
+	 * before `_idp_assets`; once no such orders matter, this and the branch in
+	 * resolve_asset() that uses it can go.
+	 *
+	 * @var array<string,string>
+	 */
+	private const LEGACY_ASSET_FIELDS = array(
+		'passport_photo' => '_idp_passport_photo',
+		'license_front'  => '_idp_license_front',
+		'license_back'   => '_idp_license_back',
+		'signature'      => '_idp_signature',
 	);
 
 	/**
@@ -56,9 +88,9 @@ final class Order_Data {
 	/**
 	 * Where an order was taken, and the bucket its uploads live in.
 	 *
-	 * The checkout stores the four image fields as a path relative to one of
-	 * these — "2026/07/29/084250-394/portrait.jpg" — so the host cannot be
-	 * inferred from the value itself and has to come from `_idp_order_from`.
+	 * The checkout stores `_idp_assets` as a path relative to one of these —
+	 * "2026/08/01/063701-213" — so the host cannot be inferred from the value
+	 * itself and has to come from `_idp_order_from`.
 	 *
 	 * Keys are compared lower-case. Add another front end with the
 	 * `idta_pdf_order_sources` filter rather than editing this list.
@@ -163,7 +195,11 @@ final class Order_Data {
 	public function __construct( \WC_Order $order ) {
 		$this->order = $order;
 
-		foreach ( array_keys( self::FIELDS ) as $key ) {
+		// The retired keys are loaded alongside the current ones so an order from
+		// before `_idp_assets` still resolves its images. See LEGACY_ASSET_FIELDS.
+		$keys = array_merge( array_keys( self::FIELDS ), array_values( self::LEGACY_ASSET_FIELDS ) );
+
+		foreach ( $keys as $key ) {
 			$value = $order->get_meta( $key, true );
 
 			$this->meta[ $key ] = is_scalar( $value ) ? trim( (string) $value ) : '';
@@ -374,7 +410,7 @@ final class Order_Data {
 		 * Filters the upload sources an order may have been taken through.
 		 *
 		 * Keyed by the lower-case value stored in `_idp_order_from`, each a base
-		 * URL the four image fields are relative to.
+		 * URL `_idp_assets` is relative to.
 		 *
 		 * @param array<string,string> $sources Base URLs keyed by source.
 		 */
@@ -391,6 +427,41 @@ final class Order_Data {
 		}
 
 		return $sources;
+	}
+
+	/**
+	 * Filenames within `_idp_assets`, keyed as in self::ASSET_FILES.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function asset_filenames(): array {
+		static $files = null;
+
+		if ( null !== $files ) {
+			return $files;
+		}
+
+		/**
+		 * Filters the filenames expected inside an order's asset folder.
+		 *
+		 * Keyed as in Order_Data::ASSET_FILES ('passport_photo', 'license_front',
+		 * 'license_back', 'signature'). Change this if the upload step ever names
+		 * the files differently, rather than reintroducing four separate meta
+		 * fields to hold full paths.
+		 *
+		 * @param array<string,string> $files Filenames keyed by image.
+		 */
+		$filtered = apply_filters( 'idta_pdf_asset_filenames', self::ASSET_FILES );
+
+		$files = array();
+
+		foreach ( (array) $filtered as $key => $name ) {
+			if ( is_string( $key ) && is_string( $name ) && '' !== trim( $name ) ) {
+				$files[ $key ] = ltrim( trim( $name ), '/' );
+			}
+		}
+
+		return $files;
 	}
 
 	/**
@@ -601,7 +672,7 @@ final class Order_Data {
 	 * @return string
 	 */
 	public function passport_photo(): string {
-		return $this->normalise_url( $this->get( '_idp_passport_photo' ) );
+		return $this->resolve_asset( 'passport_photo' );
 	}
 
 	/**
@@ -610,7 +681,7 @@ final class Order_Data {
 	 * @return string
 	 */
 	public function signature(): string {
-		return $this->normalise_url( $this->get( '_idp_signature' ) );
+		return $this->resolve_asset( 'signature' );
 	}
 
 	/**
@@ -619,7 +690,7 @@ final class Order_Data {
 	 * @return string
 	 */
 	public function license_front(): string {
-		return $this->normalise_url( $this->get( '_idp_license_front' ) );
+		return $this->resolve_asset( 'license_front' );
 	}
 
 	/**
@@ -628,7 +699,34 @@ final class Order_Data {
 	 * @return string
 	 */
 	public function license_back(): string {
-		return $this->normalise_url( $this->get( '_idp_license_back' ) );
+		return $this->resolve_asset( 'license_back' );
+	}
+
+	/**
+	 * Resolve one of the four uploaded images.
+	 *
+	 * The folder in `_idp_assets` plus the image's standard filename, which is all
+	 * a current order stores.
+	 *
+	 * An order written before `_idp_assets` has no folder but does have a full path
+	 * in a retired per-image key, so that is read as a fallback rather than leaving
+	 * the order without images. See LEGACY_ASSET_FIELDS.
+	 *
+	 * @param string $asset_key Key into self::asset_filenames().
+	 *
+	 * @return string
+	 */
+	private function resolve_asset( string $asset_key ): string {
+		$folder   = trim( str_replace( '\/', '/', $this->get( '_idp_assets' ) ) );
+		$filename = self::asset_filenames()[ $asset_key ] ?? '';
+
+		if ( '' !== $folder && '' !== $filename ) {
+			return $this->normalise_url( trailingslashit( $folder ) . $filename );
+		}
+
+		$legacy = $this->get( self::LEGACY_ASSET_FIELDS[ $asset_key ] ?? '' );
+
+		return '' !== $legacy ? $this->normalise_url( $legacy ) : '';
 	}
 
 	/**

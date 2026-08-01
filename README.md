@@ -45,31 +45,43 @@ unreachable is skipped rather than breaking the document.
 Read from the order, exactly as the checkout writes it:
 
 ```
-_idp_order_from          _idp_country_of_residence    _idp_passport_photo
-_idp_first_name          _idp_driver_license_number   _idp_license_front
-_idp_middle_name         _idp_country_of_issuance     _idp_license_back
-_idp_last_name           _idp_license_category        _idp_signature
+_idp_order_from          _idp_country_of_residence    _idp_assets
+_idp_first_name          _idp_driver_license_number
+_idp_middle_name         _idp_country_of_issuance
+_idp_last_name           _idp_license_category
 _idp_date_of_birth       _idp_validity_years
 _idp_gender              _idp_format
 _idp_country_of_birth
 ```
 
 A shop manager can read and correct all of these on the order screen, under **IDP
-Driver Details (editable)**, with a thumbnail beside each of the four images.
-Saving only updates the order — use **Regenerate** in the IDP Documents panel to
-rebuild the PDFs afterwards.
+Driver Details (editable)**, with a thumbnail for each of the four uploaded
+images. Saving only updates the order — use **Regenerate** in the IDP Documents
+panel to rebuild the PDFs afterwards.
 
-### Uploaded images and `_idp_order_from`
+### Uploaded images: `_idp_assets` and `_idp_order_from`
 
-The four image fields hold a path relative to the bucket the order was taken
-through, not a full URL:
+All four uploads for an order land in one folder, always under the same four
+filenames, so only the folder is stored — a path relative to the bucket the order
+was taken through, not a full URL:
 
 ```
-2026/07/29/084250-394/portrait.jpg
-2026/07/30/162022-151/license-back-riyad.jpg
+_idp_assets => 2026/08/01/063701-213
 ```
 
-`_idp_order_from` says which bucket, and so which base URL to put back:
+which resolves to:
+
+```
+2026/08/01/063701-213/portrait.jpg
+2026/08/01/063701-213/license-front.jpg
+2026/08/01/063701-213/license-back.jpg
+2026/08/01/063701-213/signature.png
+```
+
+Change the expected filenames with the `idta_pdf_asset_filenames` filter if the
+upload step is ever renamed.
+
+`_idp_order_from` says which bucket, and so which base URL to put in front:
 
 | `_idp_order_from` | Base URL |
 | --- | --- |
@@ -79,10 +91,18 @@ through, not a full URL:
 Compared case-insensitively. Add another front end with the
 `idta_pdf_order_sources` filter rather than editing the plugin.
 
+`_idp_assets` replaced four separate meta fields — `_idp_passport_photo`,
+`_idp_license_front`, `_idp_license_back`, `_idp_signature` — each of which held a
+full path. Nothing writes those any more and they are not shown on the order
+screen, but they are still **read** as a fallback when `_idp_assets` is absent, so
+orders already in the database keep their images. `Order_Data::LEGACY_ASSET_FIELDS`
+and the one branch in `resolve_asset()` that uses it can be deleted once no such
+orders matter.
+
 Two kinds of stored value are already complete and are left alone: an absolute
-URL, which is how orders placed before `_idp_order_from` existed stored these;
-and a path into this site's own directories (`/wp-content/…`). Anything else is
-treated as bucket-relative, including a value that arrives with a leading slash.
+URL, which is how the oldest orders stored these; and a path into this site's own
+directories (`/wp-content/…`). Anything else is treated as bucket-relative,
+including a value that arrives with a leading slash.
 
 An order that stores a relative path but names no recognised source falls back to
 `idta` — override with the `idta_pdf_default_order_source` filter, or return an

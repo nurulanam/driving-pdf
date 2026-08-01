@@ -23,9 +23,11 @@ needs to be entered again — and a shop manager can read or correct every field
 the order screen, under **IDP Driver Details (editable)**, with a thumbnail beside
 each uploaded image.
 
-The four uploaded images are stored as a path relative to the bucket the order
-came through, so `_idp_order_from` records which one: `idta` or `idpa`. Get that
-value wrong and the images cannot be fetched, which the thumbnails will show.
+All four uploaded images land in one shared folder, so only that folder is
+stored (`_idp_assets`), as a path relative to the bucket the order came through —
+`_idp_order_from` records which one, `idta` or `idpa`. Get that value wrong and
+none of the images can be fetched, which the thumbnails on the order screen will
+show.
 
 The booklet's nineteen translation pages are set as text rather than scans, in
 Latin, Arabic, Cyrillic, Chinese, Japanese, Korean, Amharic, Devanagari and Thai,

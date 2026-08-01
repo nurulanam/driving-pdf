@@ -15,10 +15,10 @@ defined( 'ABSPATH' ) || exit;
  * Lets a shop manager read and correct the `_idp_*` meta an order carries, with
  * a thumbnail for each of the four uploaded images.
  *
- * The image fields hold a path relative to the bucket the order was taken
- * through, so the previews here resolve them through Order_Data — the same code
- * the PDFs use. A thumbnail that fails to load is therefore a genuine signal
- * that generation will not find the image either.
+ * All four images come from the one folder in `_idp_assets`, so that is the only
+ * field for them. The previews resolve through Order_Data, the same accessors the
+ * PDFs call, so a thumbnail that fails to load is a genuine signal that
+ * generation will not find the image either.
  */
 final class Order_Fields {
 
@@ -31,18 +31,6 @@ final class Order_Fields {
 	 * Nonce field name.
 	 */
 	private const NONCE_NAME = 'idta_pdf_order_fields_nonce';
-
-	/**
-	 * Meta keys holding an uploaded image.
-	 *
-	 * @var string[]
-	 */
-	private const IMAGE_KEYS = array(
-		'_idp_passport_photo',
-		'_idp_license_front',
-		'_idp_license_back',
-		'_idp_signature',
-	);
 
 	/**
 	 * Register hooks.
@@ -119,8 +107,13 @@ final class Order_Fields {
 				);
 			}
 
-			if ( in_array( $key, self::IMAGE_KEYS, true ) ) {
-				$this->render_preview( $data, $key );
+			if ( '_idp_assets' === $key ) {
+				printf(
+					'<p class="description">%s</p>',
+					esc_html__( 'Folder holding all four uploads, e.g. 2026/08/01/063701-213.', 'idta-pdf' )
+				);
+
+				$this->render_asset_previews( $data );
 			}
 
 			echo '</td></tr>';
@@ -171,44 +164,69 @@ final class Order_Fields {
 
 		printf(
 			'<p class="description">%s</p>',
-			esc_html__( 'Which front end took the order. Decides the base URL the four image paths below are resolved against.', 'idta-pdf' )
+			esc_html__( 'Which front end took the order. Decides the base URL the assets folder is resolved against.', 'idta-pdf' )
 		);
 	}
 
 	/**
-	 * Render the thumbnail and resolved URL for one image field.
+	 * Render a thumbnail for each of the four images, together.
+	 *
+	 * One grid under the Assets Folder field, since that single value is what
+	 * produces all four. The URLs come from the same accessors the PDFs call, so a
+	 * thumbnail that fails to load means generation will not find the image either.
 	 *
 	 * @param Order_Data $data Order data.
-	 * @param string     $key  Meta key.
 	 */
-	private function render_preview( Order_Data $data, string $key ): void {
-		$url = match ( $key ) {
-			'_idp_passport_photo' => $data->passport_photo(),
-			'_idp_license_front'  => $data->license_front(),
-			'_idp_license_back'   => $data->license_back(),
-			'_idp_signature'      => $data->signature(),
-			default               => '',
-		};
+	private function render_asset_previews( Order_Data $data ): void {
+		$labels = array(
+			'passport_photo' => __( 'Passport photo', 'idta-pdf' ),
+			'license_front'  => __( 'License front', 'idta-pdf' ),
+			'license_back'   => __( 'License back', 'idta-pdf' ),
+			'signature'      => __( 'Signature', 'idta-pdf' ),
+		);
 
-		if ( '' === $url ) {
-			if ( '' !== trim( (string) $data->get( $key ) ) ) {
+		$urls = array(
+			'passport_photo' => $data->passport_photo(),
+			'license_front'  => $data->license_front(),
+			'license_back'   => $data->license_back(),
+			'signature'      => $data->signature(),
+		);
+
+		if ( array() === array_filter( $urls ) ) {
+			// A folder is set but resolved to nothing, which means the source is
+			// unknown; with no folder at all there is simply nothing to show yet.
+			if ( '' !== trim( (string) $data->get( '_idp_assets' ) ) ) {
 				printf(
 					'<p class="idta-fields__warning">%s</p>',
-					esc_html__( 'Stored as a relative path, but the order names no known source — set Order From above.', 'idta-pdf' )
+					esc_html__( 'A folder is stored, but the order names no known source — set Order From above.', 'idta-pdf' )
 				);
 			}
 
 			return;
 		}
 
-		printf(
-			'<div class="idta-fields__preview">'
-			. '<a href="%1$s" target="_blank" rel="noreferrer noopener"><img src="%1$s" alt=""></a>'
-			. '<a href="%1$s" target="_blank" rel="noreferrer noopener">%2$s &rarr;</a>'
-			. '</div>',
-			esc_url( $url ),
-			esc_html__( 'View full size', 'idta-pdf' )
-		);
+		echo '<div class="idta-fields__grid">';
+
+		foreach ( $labels as $asset_key => $label ) {
+			$url = $urls[ $asset_key ];
+
+			echo '<div class="idta-fields__grid-item">';
+			printf( '<p class="idta-fields__grid-label">%s</p>', esc_html( $label ) );
+
+			if ( '' !== $url ) {
+				printf(
+					'<a href="%1$s" target="_blank" rel="noreferrer noopener"><img src="%1$s" alt="%2$s"></a>',
+					esc_url( $url ),
+					esc_attr( $label )
+				);
+			} else {
+				printf( '<p class="description">%s</p>', esc_html__( 'Not set.', 'idta-pdf' ) );
+			}
+
+			echo '</div>';
+		}
+
+		echo '</div>';
 	}
 
 	/**
@@ -288,10 +306,12 @@ final class Order_Fields {
 			.idta-fields td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
 			.idta-fields th { width: 25%; font-weight: 600; }
 			.idta-fields__input { width: 100%; max-width: 420px; }
-			.idta-fields__preview { margin-top: 6px; }
-			.idta-fields__preview img { max-width: 100px; height: auto; display: block; margin-bottom: 4px; border: 1px solid #ccd0d4; border-radius: 4px; }
-			.idta-fields__preview a { font-size: 11px; font-weight: 600; text-decoration: none; }
 			.idta-fields__warning { margin: 6px 0 0; color: #b32d2e; font-size: 12px; }
+			.idta-fields__grid { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+			.idta-fields__grid-item { width: 110px; }
+			.idta-fields__grid-label { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: #1d2327; }
+			.idta-fields__grid-item img { max-width: 100%; height: auto; display: block; border: 1px solid #ccd0d4; border-radius: 4px; }
+			.idta-fields__grid-item .description { margin: 0; font-size: 11px; }
 		</style>';
 	}
 
