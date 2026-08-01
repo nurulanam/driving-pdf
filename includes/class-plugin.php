@@ -22,6 +22,11 @@ final class Plugin {
 	public const ASYNC_HOOK = 'idta_pdf_generate_documents';
 
 	/**
+	 * Option recording the version whose one-time setup has already run.
+	 */
+	private const VERSION_OPTION = 'idta_pdf_version';
+
+	/**
 	 * Sole instance.
 	 *
 	 * @var Plugin|null
@@ -106,6 +111,8 @@ final class Plugin {
 			return;
 		}
 
+		add_action( 'init', array( $this, 'maybe_upgrade' ), 5 );
+
 		// Primary trigger: generate as soon as the order is placed, whatever
 		// its payment status. Covers both the classic checkout and the
 		// block-based Store API checkout.
@@ -144,10 +151,31 @@ final class Plugin {
 		$order_admin = new Order_Admin( $this->generator );
 		$order_admin->register();
 
+		( new Order_Fields() )->register();
+
 		( new Settings_Page( $this->settings ) )->register();
 		( new Download_Handler( $this->generator ) )->register();
+		( new Public_Pages( $this->generator, $this->settings ) )->register();
 		( new Email_Attachments( $this->settings, $this->generator ) )->register();
 		( new Order_List_Column( $this->generator, $order_admin ) )->register();
+	}
+
+	/**
+	 * Run one-time work after the plugin files change.
+	 *
+	 * activate() only fires when the plugin is activated, so a site that updates
+	 * the files in place — over SFTP, or through an updater — never runs it and
+	 * would be left without the pages the QR codes point at. Gated on a stored
+	 * version so this costs one option read per request and nothing else.
+	 */
+	public function maybe_upgrade(): void {
+		if ( get_option( self::VERSION_OPTION ) === VERSION ) {
+			return;
+		}
+
+		Public_Pages::ensure_pages();
+
+		update_option( self::VERSION_OPTION, VERSION );
 	}
 
 	/**
@@ -157,6 +185,13 @@ final class Plugin {
 		( new Filesystem() )->ensure_base_dir();
 
 		add_option( Settings::OPTION_KEY, ( new Settings() )->defaults() );
+
+		// The pages the QR codes point at. Idempotent: an existing page at either
+		// slug is adopted rather than duplicated.
+		Public_Pages::ensure_pages();
+
+		// Their slugs need to resolve on the next request.
+		flush_rewrite_rules();
 	}
 
 	/**

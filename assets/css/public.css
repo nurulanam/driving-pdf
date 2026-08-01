@@ -1,0 +1,257 @@
+/**
+ * The public permit and details pages.
+ *
+ * Inlined into a standalone document by Public_Pages, so it stands alone: no
+ * theme reset, no framework, nothing enqueued. Written mobile-first, because
+ * these pages are reached by scanning a printed QR code with a phone.
+ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body.idta-public {
+	margin: 0;
+	padding: 24px 16px 48px;
+	background: #f2f4f7;
+	color: #071f3d;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-size: 16px;
+	line-height: 1.5;
+	-webkit-text-size-adjust: 100%;
+}
+
+.idta-wrap {
+	max-width: 640px;
+	margin: 0 auto;
+}
+
+.idta-card {
+	background: #fff;
+	border-radius: 14px;
+	padding: 24px 20px;
+	box-shadow: 0 1px 2px rgba(7, 31, 61, 0.08), 0 8px 24px rgba(7, 31, 61, 0.06);
+}
+
+.idta-card + .idta-card {
+	margin-top: 16px;
+}
+
+.idta-card--empty {
+	text-align: center;
+}
+
+.idta-card h1 {
+	margin: 0 0 4px;
+	font-size: 22px;
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+}
+
+.idta-card h2 {
+	margin: 0 0 12px;
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #5b6b83;
+}
+
+.idta-card p {
+	margin: 0 0 12px;
+}
+
+.idta-card p:last-child {
+	margin-bottom: 0;
+}
+
+.idta-lede {
+	margin: 0 0 20px;
+	color: #5b6b83;
+}
+
+/* ---- The permit reference, shown as the page's headline fact ---- */
+
+.idta-ref {
+	display: inline-block;
+	margin: 0 0 20px;
+	padding: 6px 12px;
+	border-radius: 8px;
+	background: #eef2f7;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 15px;
+	letter-spacing: 0.04em;
+}
+
+/* ---- Download buttons ---- */
+
+.idta-button {
+	display: block;
+	width: 100%;
+	padding: 15px 20px;
+	border: 0;
+	border-radius: 10px;
+	background: #071f3d;
+	color: #fff;
+	font-size: 16px;
+	font-weight: 600;
+	text-align: center;
+	text-decoration: none;
+}
+
+.idta-button:hover,
+.idta-button:focus {
+	background: #12365f;
+}
+
+.idta-button + .idta-button {
+	margin-top: 10px;
+}
+
+.idta-button--secondary {
+	background: #fff;
+	color: #071f3d;
+	box-shadow: inset 0 0 0 1.5px #cdd6e2;
+}
+
+.idta-button--secondary:hover,
+.idta-button--secondary:focus {
+	background: #f7f9fc;
+	box-shadow: inset 0 0 0 1.5px #071f3d;
+}
+
+.idta-note {
+	margin: 16px 0 0;
+	font-size: 13px;
+	color: #5b6b83;
+}
+
+/* ---- Detail rows ---- */
+
+/**
+ * A description list rather than a table: on a narrow screen each label sits
+ * above its value instead of being squeezed into a column, and it stays a
+ * name/value structure for a screen reader either way.
+ */
+.idta-details {
+	margin: 0;
+}
+
+.idta-details__row {
+	padding: 12px 0;
+	border-top: 1px solid #e6ebf2;
+}
+
+.idta-details__row:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.idta-details dt {
+	margin: 0 0 2px;
+	font-size: 13px;
+	color: #5b6b83;
+}
+
+.idta-details dd {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 600;
+	word-break: break-word;
+}
+
+/* ---- Licence scans ---- */
+
+.idta-scans {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+	.idta-scans {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.idta-scan {
+	margin: 0;
+}
+
+.idta-scan img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 10px;
+	background: #eef2f7;
+}
+
+.idta-scan figcaption {
+	margin-top: 6px;
+	font-size: 13px;
+	color: #5b6b83;
+	text-align: center;
+}
+
+.idta-footer {
+	margin: 20px 0 0;
+	font-size: 13px;
+	color: #7c8798;
+	text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+	body.idta-public {
+		background: #0d1520;
+		color: #e8edf4;
+	}
+
+	.idta-card {
+		background: #16202e;
+		box-shadow: none;
+	}
+
+	.idta-card h2,
+	.idta-lede,
+	.idta-note,
+	.idta-details dt,
+	.idta-scan figcaption,
+	.idta-footer {
+		color: #9aa8bc;
+	}
+
+	.idta-ref {
+		background: #1f2b3c;
+	}
+
+	.idta-details__row {
+		border-top-color: #24303f;
+	}
+
+	.idta-button {
+		background: #3d7dd8;
+	}
+
+	.idta-button:hover,
+	.idta-button:focus {
+		background: #4b8ae4;
+	}
+
+	.idta-button--secondary {
+		background: transparent;
+		color: #e8edf4;
+		box-shadow: inset 0 0 0 1.5px #35435a;
+	}
+
+	.idta-button--secondary:hover,
+	.idta-button--secondary:focus {
+		background: #1b2735;
+		box-shadow: inset 0 0 0 1.5px #5c6d88;
+	}
+
+	.idta-scan img {
+		background: #1f2b3c;
+	}
+}

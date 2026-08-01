@@ -33,12 +33,17 @@ fi
 
 echo "Staging..."
 
+# test.php is a scratch file carrying its own "Plugin Name:" header. Shipping it
+# would make WordPress list a second plugin inside this one, and activating it
+# would register a duplicate driver-details metabox fighting the real one over the
+# same meta. Its functionality now lives in includes/class-order-fields.php.
 rsync -a \
 	--exclude '.git' \
 	--exclude '.github' \
 	--exclude '.gitignore' \
 	--exclude 'bin/' \
 	--exclude 'old/' \
+	--exclude 'test.php' \
 	--exclude '*.zip' \
 	--exclude '*.log' \
 	--exclude '.DS_Store' \

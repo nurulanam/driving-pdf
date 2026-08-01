@@ -19,7 +19,13 @@ Two documents are produced per order:
 * **Permit card** — 85.6 × 53.98 mm (ISO/IEC 7810 ID-1) portrait, 2 pages
 
 Both are built from the `_idp_*` meta the checkout writes on the order. Nothing
-needs to be entered again.
+needs to be entered again — and a shop manager can read or correct every field on
+the order screen, under **IDP Driver Details (editable)**, with a thumbnail beside
+each uploaded image.
+
+The four uploaded images are stored as a path relative to the bucket the order
+came through, so `_idp_order_from` records which one: `idta` or `idpa`. Get that
+value wrong and the images cannot be fetched, which the thumbnails will show.
 
 The booklet's nineteen translation pages are set as text rather than scans, in
 Latin, Arabic, Cyrillic, Chinese, Japanese, Korean, Amharic, Devanagari and Thai,
@@ -55,6 +61,20 @@ directory. Nothing is deleted until the plugin is uninstalled.
 
 == Frequently Asked Questions ==
 
+= What are the /idp/ and /show-details/ pages? =
+
+The two pages the QR codes point at, created empty on activation. `/idp/` offers
+the permit PDF; `/show-details/` lists the holder's details and licence scans.
+Both need the `entry_key` token from the printed code — without it, or with one
+meant for the other page, they return 404 and show nothing.
+
+They render as a standalone page without the theme's header and footer, on
+purpose: they are opened on a phone immediately after scanning. Don't add content
+to them in the editor — the markup comes from the plugin and page content is
+ignored.
+
+If the pages are missing, deactivate and reactivate the plugin.
+
 = When are the PDFs generated? =
 
 On checkout, queued through Action Scheduler so the customer is never kept
@@ -64,10 +84,10 @@ if payment confirmation, not checkout, is when an order becomes real for you.
 
 = An order has no PDFs. =
 
-The WooCommerce order list has an **IDP Documents** column at the right with a
-**Generate Permit** / **Generate Card** button for anything missing, and the same
-actions are on the order edit screen. If generation failed, the reason is shown in
-the panel there.
+The WooCommerce order list has a **PDFs** column at the right with a **Generate
+Permit** / **Generate Card** button for anything missing, a regenerate icon, and —
+when a document failed — a red warning icon whose tooltip is the actual error.
+Hover it: that message is the fastest way to find out what went wrong.
 
 Orders with no `_idp_*` meta show a dash: they are not IDP orders and are skipped.
 
@@ -103,7 +123,7 @@ the mPDF constraints the layout works within.
 
 == Screenshots ==
 
-1. The IDP Documents column in the WooCommerce order list.
+1. The PDFs column in the WooCommerce order list.
 2. The IDP Documents panel on the order edit screen.
 3. The settings screen.
 

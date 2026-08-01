@@ -22,6 +22,7 @@ final class Order_Data {
 	 * @var array<string,string>
 	 */
 	public const FIELDS = array(
+		'_idp_order_from'            => 'Order From',
 		'_idp_first_name'            => 'First Name',
 		'_idp_middle_name'           => 'Middle Name',
 		'_idp_last_name'             => 'Last Name',
@@ -51,6 +52,23 @@ final class Order_Data {
 	 * Meta key holding the generated permit number.
 	 */
 	public const CARD_NUMBER_META = '_idp_card_number';
+
+	/**
+	 * Where an order was taken, and the bucket its uploads live in.
+	 *
+	 * The checkout stores the four image fields as a path relative to one of
+	 * these — "2026/07/29/084250-394/portrait.jpg" — so the host cannot be
+	 * inferred from the value itself and has to come from `_idp_order_from`.
+	 *
+	 * Keys are compared lower-case. Add another front end with the
+	 * `idta_pdf_order_sources` filter rather than editing this list.
+	 *
+	 * @var array<string,string>
+	 */
+	public const SOURCES = array(
+		'idta' => 'https://idta-upload.shamim66ewu.workers.dev/files/',
+		'idpa' => 'https://pub-1c2e77688359483ca692ff2d8369b41b.r2.dev/',
+	);
 
 	/**
 	 * Countries party to the Vienna Convention on Road Traffic of 8 November 1968.
@@ -300,6 +318,79 @@ final class Order_Data {
 	 */
 	public function format(): string {
 		return strtolower( $this->get( '_idp_format' ) );
+	}
+
+	/**
+	 * Front end the order came from, as a key of self::sources().
+	 *
+	 * @return string Source key, or an empty string when it is not recognised.
+	 */
+	public function order_from(): string {
+		$source = strtolower( trim( $this->get( '_idp_order_from' ) ) );
+
+		if ( isset( self::sources()[ $source ] ) ) {
+			return $source;
+		}
+
+		/**
+		 * Filters the source assumed for an order that does not name one.
+		 *
+		 * Orders placed before `_idp_order_from` existed stored absolute URLs, so
+		 * they resolve without this. It only matters for a relative path with no
+		 * source recorded, where the bucket genuinely cannot be worked out.
+		 *
+		 * @param string     $source Source key, or an empty string to give up.
+		 * @param Order_Data $data   Order data.
+		 */
+		$fallback = (string) apply_filters( 'idta_pdf_default_order_source', 'idta', $this );
+
+		return isset( self::sources()[ $fallback ] ) ? $fallback : '';
+	}
+
+	/**
+	 * Base URL the order's uploads are stored under.
+	 *
+	 * @return string Base URL with a trailing slash, or an empty string.
+	 */
+	public function asset_base_url(): string {
+		$source = $this->order_from();
+
+		return '' !== $source ? self::sources()[ $source ] : '';
+	}
+
+	/**
+	 * Upload sources, keyed by the value stored in `_idp_order_from`.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function sources(): array {
+		static $sources = null;
+
+		if ( null !== $sources ) {
+			return $sources;
+		}
+
+		/**
+		 * Filters the upload sources an order may have been taken through.
+		 *
+		 * Keyed by the lower-case value stored in `_idp_order_from`, each a base
+		 * URL the four image fields are relative to.
+		 *
+		 * @param array<string,string> $sources Base URLs keyed by source.
+		 */
+		$filtered = apply_filters( 'idta_pdf_order_sources', self::SOURCES );
+
+		$sources = array();
+
+		foreach ( (array) $filtered as $key => $base ) {
+			if ( ! is_string( $key ) || ! is_string( $base ) || '' === trim( $base ) ) {
+				continue;
+			}
+
+			$sources[ strtolower( trim( $key ) ) ] = trailingslashit( trim( $base ) );
+		}
+
+		return $sources;
 	}
 
 	/**
@@ -573,9 +664,61 @@ final class Order_Data {
 			}
 		}
 
-		$value = str_replace( '\/', '/', $value );
+		$value = trim( str_replace( '\/', '/', $value ) );
 
-		return esc_url_raw( trim( $value ) );
+		if ( '' === $value ) {
+			return '';
+		}
+
+		/*
+		 * The checkout now stores these as a path relative to the bucket the
+		 * order was taken through — "2026/07/29/084250-394/portrait.jpg" — so the
+		 * base URL has to be put back before anything can fetch it.
+		 *
+		 * Two kinds of value are already complete. An absolute URL, which is how
+		 * orders placed before `_idp_order_from` existed stored these. And a path
+		 * into this site's own directories, which Image_Helper resolves locally;
+		 * that is checked for by name rather than by a leading slash alone,
+		 * because a bucket path may arrive with one and "/2026/07/..." would
+		 * otherwise be looked for on this server and 404.
+		 */
+		$absolute = 1 === preg_match( '#^(?:[a-z][a-z0-9+.-]*:|//)#i', $value );
+		$on_site  = ! $absolute && 1 === preg_match( '#^/(?:wp-content|wp-includes|wp-admin)/#i', $value );
+
+		if ( ! $absolute && ! $on_site ) {
+			$base = $this->asset_base_url();
+
+			if ( '' === $base ) {
+				$this->log_unresolved_asset( $value );
+
+				return '';
+			}
+
+			$value = $base . ltrim( $value, '/' );
+		}
+
+		return esc_url_raw( $value );
+	}
+
+	/**
+	 * Note a relative asset path that could not be turned into a URL.
+	 *
+	 * @param string $value Stored path.
+	 */
+	private function log_unresolved_asset( string $value ): void {
+		if ( ! function_exists( 'wc_get_logger' ) ) {
+			return;
+		}
+
+		wc_get_logger()->warning(
+			sprintf(
+				'Order %d stores "%s" as a relative path but its _idp_order_from (%s) matches no known source, so the image was skipped.',
+				$this->order_id(),
+				$value,
+				'' !== $this->get( '_idp_order_from' ) ? $this->get( '_idp_order_from' ) : 'empty'
+			),
+			array( 'source' => 'idta-pdf' )
+		);
 	}
 
 	/**
