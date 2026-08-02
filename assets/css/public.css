@@ -43,6 +43,18 @@ body.idta-public {
 	text-align: center;
 }
 
+/* ---- Passport photo, shown above the holder's details ---- */
+
+.idta-photo {
+	display: block;
+	width: 96px;
+	height: 96px;
+	margin: 0 0 16px;
+	border-radius: 12px;
+	object-fit: cover;
+	background: #eef2f7;
+}
+
 .idta-card h1 {
 	margin: 0 0 4px;
 	font-size: 22px;
@@ -195,13 +207,6 @@ body.idta-public {
 	text-align: center;
 }
 
-.idta-footer {
-	margin: 20px 0 0;
-	font-size: 13px;
-	color: #7c8798;
-	text-align: center;
-}
-
 @media (prefers-color-scheme: dark) {
 	body.idta-public {
 		background: #0d1520;
@@ -217,8 +222,7 @@ body.idta-public {
 	.idta-lede,
 	.idta-note,
 	.idta-details dt,
-	.idta-scan figcaption,
-	.idta-footer {
+	.idta-scan figcaption {
 		color: #9aa8bc;
 	}
 
@@ -251,7 +255,8 @@ body.idta-public {
 		box-shadow: inset 0 0 0 1.5px #5c6d88;
 	}
 
-	.idta-scan img {
+	.idta-scan img,
+	.idta-photo {
 		background: #1f2b3c;
 	}
 }

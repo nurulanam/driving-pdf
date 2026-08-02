@@ -65,7 +65,3 @@ $permit_labels = array(
 		<?php esc_html_e( 'This permit is a translation of the holder\'s domestic driving licence and is valid only when presented with it.', 'idta-pdf' ); ?>
 	</p>
 </div>
-
-<p class="idta-footer">
-	<?php echo esc_html( get_bloginfo( 'name' ) ); ?>
-</p>

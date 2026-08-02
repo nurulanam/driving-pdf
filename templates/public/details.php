@@ -42,8 +42,14 @@ $detail_scans = array_filter(
 		__( 'Licence back', 'idta-pdf' )  => $data->license_back(),
 	)
 );
+
+$detail_photo = $data->passport_photo();
 ?>
 <div class="idta-card">
+
+	<?php if ( '' !== $detail_photo ) : ?>
+		<img class="idta-photo" src="<?php echo esc_url( $detail_photo ); ?>" alt="<?php esc_attr_e( 'Passport photo', 'idta-pdf' ); ?>" loading="lazy">
+	<?php endif; ?>
 
 	<h1><?php esc_html_e( 'Your details', 'idta-pdf' ); ?></h1>
 
@@ -78,7 +84,3 @@ $detail_scans = array_filter(
 		</div>
 	</div>
 <?php endif; ?>
-
-<p class="idta-footer">
-	<?php echo esc_html( get_bloginfo( 'name' ) ); ?>
-</p>
