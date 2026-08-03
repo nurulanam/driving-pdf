@@ -45,7 +45,7 @@ final class Settings {
 			'custom_css'       => '',
 			'booklet_css'      => '',
 			'card_css'         => '',
-			'trigger_statuses' => array( 'processing', 'completed' ),
+			'trigger_statuses' => array( 'pending', 'processing', 'completed' ),
 			'documents'        => array( 'booklet', 'card' ),
 			/**
 			 * Email attachments are off by default: the booklet embeds every
@@ -59,6 +59,11 @@ final class Settings {
 			'qr_base_url'      => '',
 			'qr_permit_secret' => '',
 			'qr_details_secret' => '',
+			// Base URL each order's `_idp_assets` folder is relative to, keyed by
+			// the value checkout stores in `_idp_order_from`. Falls back to
+			// Order_Data::SOURCES when nothing is configured, so upgrading sites
+			// keep working without a trip to this screen first.
+			'asset_sources'    => Order_Data::SOURCES,
 			'grayscale_ghost'  => true,
 			'debug_html'       => false,
 		);
@@ -157,10 +162,42 @@ final class Settings {
 		$clean['qr_permit_secret']  = sanitize_text_field( (string) ( $input['qr_permit_secret'] ?? '' ) );
 		$clean['qr_details_secret'] = sanitize_text_field( (string) ( $input['qr_details_secret'] ?? '' ) );
 
+		$clean['asset_sources'] = $this->sanitize_sources( (array) ( $input['asset_sources'] ?? array() ) );
+
 		$clean['grayscale_ghost'] = ! empty( $input['grayscale_ghost'] );
 		$clean['debug_html']      = ! empty( $input['debug_html'] );
 
 		return $clean;
+	}
+
+	/**
+	 * Sanitize the upload-source rows posted from the settings screen.
+	 *
+	 * @param array<int,mixed> $rows Rows, each expected to have 'key' and 'url'.
+	 *
+	 * @return array<string,string> Falls back to Order_Data::SOURCES when every
+	 *                               row is blank or missing, so the setting can
+	 *                               never leave asset resolution with nothing.
+	 */
+	private function sanitize_sources( array $rows ): array {
+		$clean = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$key = sanitize_key( (string) ( $row['key'] ?? '' ) );
+			$url = esc_url_raw( (string) ( $row['url'] ?? '' ) );
+
+			if ( '' === $key || '' === $url ) {
+				continue;
+			}
+
+			$clean[ $key ] = $url;
+		}
+
+		return array() !== $clean ? $clean : Order_Data::SOURCES;
 	}
 
 	/**
@@ -286,6 +323,24 @@ final class Settings {
 		}
 
 		return wp_salt( 'idta_pdf_' . $context );
+	}
+
+	/**
+	 * Upload-source base URLs, keyed by the value stored in `_idp_order_from`.
+	 *
+	 * @return array<string,string>
+	 */
+	public function asset_sources(): array {
+		$sources = (array) $this->get( 'asset_sources', Order_Data::SOURCES );
+		$clean   = array();
+
+		foreach ( $sources as $key => $url ) {
+			if ( is_string( $key ) && is_string( $url ) && '' !== trim( $url ) ) {
+				$clean[ strtolower( trim( $key ) ) ] = trim( $url );
+			}
+		}
+
+		return array() !== $clean ? $clean : Order_Data::SOURCES;
 	}
 
 	/**

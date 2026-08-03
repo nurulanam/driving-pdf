@@ -211,7 +211,7 @@ final class Settings_Page {
 					</tr>
 
 					<tr>
-						<th scope="row"><?php esc_html_e( 'Also generate when order becomes', 'idta-pdf' ); ?></th>
+						<th scope="row"><?php esc_html_e( 'Generate at', 'idta-pdf' ); ?></th>
 						<td>
 							<?php foreach ( $statuses as $key => $label ) : ?>
 								<?php $slug = str_replace( 'wc-', '', (string) $key ); ?>
@@ -226,7 +226,7 @@ final class Settings_Page {
 								</label>
 							<?php endforeach; ?>
 							<p class="description">
-								<?php esc_html_e( 'Documents are always generated in the background as soon as the order is placed. These statuses are an extra trigger for orders whose IDP details arrive later.', 'idta-pdf' ); ?>
+								<?php esc_html_e( 'Documents generate only when an order reaches one of the checked statuses. Include "pending" to generate on new orders.', 'idta-pdf' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -302,6 +302,66 @@ final class Settings_Page {
 								class="regular-text code"
 								autocomplete="off"
 							>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Upload sources', 'idta-pdf' ); ?></th>
+						<td>
+							<?php
+							$configured_sources = is_array( $values['asset_sources'] ) && array() !== $values['asset_sources']
+								? $values['asset_sources']
+								: Order_Data::SOURCES;
+
+							// A list of [key, url] pairs rather than a map: a map cannot
+							// hold the several blank trailing rows below (all keyed ''),
+							// which are how a new source is added without a "remove"
+							// control or any JavaScript on the page.
+							$source_rows = array();
+
+							foreach ( $configured_sources as $source_key => $source_url ) {
+								$source_rows[] = array( (string) $source_key, (string) $source_url );
+							}
+
+							for ( $i = 0; $i < 3; $i++ ) {
+								$source_rows[] = array( '', '' );
+							}
+							?>
+							<table class="idta-source-rows">
+								<thead>
+									<tr>
+										<th style="text-align:left;font-weight:600;padding:0 8px 4px 0;"><?php esc_html_e( 'Order From value', 'idta-pdf' ); ?></th>
+										<th style="text-align:left;font-weight:600;padding:0 0 4px;"><?php esc_html_e( 'Base URL', 'idta-pdf' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $source_rows as $row_index => $source_row ) : ?>
+										<tr>
+											<td style="padding:2px 8px 2px 0;">
+												<input
+													type="text"
+													name="idta_pdf[asset_sources][<?php echo (int) $row_index; ?>][key]"
+													value="<?php echo esc_attr( $source_row[0] ); ?>"
+													class="regular-text code"
+													placeholder="<?php esc_attr_e( 'e.g. idta', 'idta-pdf' ); ?>"
+												>
+											</td>
+											<td style="padding:2px 0;">
+												<input
+													type="url"
+													name="idta_pdf[asset_sources][<?php echo (int) $row_index; ?>][url]"
+													value="<?php echo esc_attr( $source_row[1] ); ?>"
+													class="regular-text code"
+													placeholder="https://…/files/"
+												>
+											</td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+							<p class="description">
+								<?php esc_html_e( 'Each row maps a value the checkout stores in "_idp_order_from" to the base URL that order\'s _idp_assets folder is relative to. Blank rows are ignored; leaving all rows blank restores the built-in defaults.', 'idta-pdf' ); ?>
+							</p>
 						</td>
 					</tr>
 

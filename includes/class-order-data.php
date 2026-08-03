@@ -92,8 +92,11 @@ final class Order_Data {
 	 * "2026/08/01/063701-213" — so the host cannot be inferred from the value
 	 * itself and has to come from `_idp_order_from`.
 	 *
-	 * Keys are compared lower-case. Add another front end with the
-	 * `idta_pdf_order_sources` filter rather than editing this list.
+	 * Keys are compared lower-case. This is the fallback used only when the
+	 * settings screen has none configured (see Settings::asset_sources()) — an
+	 * administrator manages the real list under IDTA PDF → Verification.
+	 * Add another front end programmatically with the `idta_pdf_order_sources`
+	 * filter, which is applied on top of whichever list is in effect.
 	 *
 	 * @var array<string,string>
 	 */
@@ -406,15 +409,23 @@ final class Order_Data {
 			return $sources;
 		}
 
+		// The settings screen is the normal way to manage this list; the function
+		// may not exist in an isolated test script that loads this class on its
+		// own, so the hardcoded default still applies there.
+		$configured = function_exists( __NAMESPACE__ . '\\plugin' )
+			? plugin()->settings()->asset_sources()
+			: self::SOURCES;
+
 		/**
 		 * Filters the upload sources an order may have been taken through.
 		 *
 		 * Keyed by the lower-case value stored in `_idp_order_from`, each a base
-		 * URL `_idp_assets` is relative to.
+		 * URL `_idp_assets` is relative to. Applied on top of whatever is
+		 * configured on the settings screen (IDTA PDF → Verification).
 		 *
 		 * @param array<string,string> $sources Base URLs keyed by source.
 		 */
-		$filtered = apply_filters( 'idta_pdf_order_sources', self::SOURCES );
+		$filtered = apply_filters( 'idta_pdf_order_sources', $configured );
 
 		$sources = array();
 

@@ -119,28 +119,6 @@ final class Plugin {
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'schedule_generation' ), 20, 1 );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( $this, 'schedule_generation' ), 20, 1 );
 
-		// Fallback triggers, for IDP meta that is only written after the order
-		// is placed (a delayed upload, a status change, an admin-created
-		// order). schedule_generation() no-ops once documents already exist.
-		add_action( 'woocommerce_new_order', array( $this, 'schedule_generation' ), 20, 1 );
-		add_action( 'woocommerce_payment_complete', array( $this, 'schedule_generation' ), 20, 1 );
-
-		/*
-		 * Broadest fallback: every order save, whatever wrote it. The hooks above
-		 * only fire at specific points in WooCommerce's own checkout and status
-		 * lifecycle; a checkout-fields plugin, a custom endpoint, or an admin
-		 * screen can write the _idp_* meta and call $order->save() at any other
-		 * time, and none of those points would otherwise get a second look. This
-		 * fires on both HPOS and legacy post-based orders, since it comes from
-		 * WC_Order itself rather than a specific data store.
-		 *
-		 * schedule_generation() re-derives the order ID from the object, checks
-		 * Order_Data::has_data() and is_generated()/is_queued() before doing
-		 * anything, so a plain status update on an already-complete order is a
-		 * cheap no-op rather than a second render.
-		 */
-		add_action( 'woocommerce_after_order_object_save', array( $this, 'schedule_generation_for_order' ), 20, 1 );
-
 		foreach ( $this->settings->trigger_statuses() as $status ) {
 			add_action( 'woocommerce_order_status_' . $status, array( $this, 'schedule_generation' ), 20, 1 );
 		}
