@@ -79,7 +79,7 @@
 
 .idta-cover__expiry {
 	font-family: dejavusans;
-	font-size: 12pt;
+	font-size: 14pt;
 	font-weight: bold;
 	margin: 0 0 10mm 0;
 }
@@ -120,9 +120,13 @@
 }
 
 .idta-cover__legal {
-	font-size: 8pt;
-	line-height: 1.35;
-	margin: 0 25mm;
+	font-size: 7pt;
+	line-height: 1.3;
+	margin: 0;
+	padding-top: 5mm;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* ---- Holder details page ---- */
@@ -211,7 +215,7 @@
 }
 
 .idta-holder__photo {
-	width: 40mm;
+	width: 50mm;
 	margin: 0 auto;
 }
 
@@ -222,7 +226,7 @@
  * width is set here.
  */
 .idta-holder__portrait {
-	width: 40mm;
+	width: 50mm;
 }
 
 /**
@@ -376,6 +380,7 @@
 	width: 7.2mm;
 	border-collapse: collapse;
 	border: 0.15mm solid #999999;
+	float: right;
 }
 
 .lp-flag__stripe {
@@ -386,12 +391,13 @@
 
 /* Real flag artwork. The bundled files are square, as the scans print them. */
 .lp-flag-box {
-	width: 7.5mm;
-	height: 7.5mm;
+	width: 6mm;
+	height: 6mm;
+	padding-top: 6mm;
 }
 
 .lp-flag-box__image {
-	width: 7.5mm;
+	width: 6mm;
 }
 
 /* ---- Header: lead lines left, numbered holder fields right ---- */
@@ -432,7 +438,7 @@
 	border: 0.3mm solid #000000;
 	padding: 1.8mm 2.2mm;
 	vertical-align: top;
-	font-size: 8.5pt;
+	font-size: 9pt;
 	line-height: 1.35;
 	height: 23mm;
 }
@@ -605,6 +611,7 @@
 .lp-folio {
 	font-size: 10pt;
 	margin: 0;
+	text-align: right;
 }
 
 /* ---- Right-to-left mirror (Arabic) ---- */
@@ -614,9 +621,24 @@
  * physical sides. Every horizontal side, float and alignment is flipped.
  */
 
-.lp--rtl .lp-flag,
-.lp--rtl .lp-flag-box {
+.lp--rtl .lp-flag {
 	float: right;
+}
+
+/**
+ * The mirrored page's flag sits at the right edge.
+ *
+ * Aligned by widening the box to the content column and setting text-align,
+ * not by `float: right`: mPDF drew the floated box at the left edge anyway, so
+ * the Arabic flag stayed on the wrong side. Every other page keeps the
+ * left-hand box above.
+ */
+.lp--rtl .lp-flag-box {
+	width: 162mm;
+	height: auto;
+	text-align: right;
+	line-height: 0;
+	font-size: 0;
 }
 
 /* The label moves to the right of the rule, so its text goes with it. */

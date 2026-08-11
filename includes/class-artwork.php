@@ -41,7 +41,7 @@ final class Artwork {
 	 */
 	private const BRAND = array(
 		// Cover: the plain seal, then the authorised signature beneath it.
-		'cover_logo' => 'assets/img/blank-stamp.png',
+		'cover_logo' => 'assets/img/cover-logo.png',
 		'signature'  => 'assets/img/idta-signature.png',
 		// The horizontal lockup, used on the language index.
 		'logo'       => 'assets/img/Idta logo.png',

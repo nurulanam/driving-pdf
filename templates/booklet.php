@@ -128,9 +128,7 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 	<p class="idta-cover__order"><?php echo esc_html( $context['card_number'] ); ?></p>
 
 	<p class="idta-cover__legal">
-		<?php esc_html_e( 'This International Driving Permit is issued in accordance with the United Nations Conventions on Road Traffic of 1949 and 1968.', 'idta-pdf' ); ?><br>
-		<?php esc_html_e( 'Acceptance of this permit is subject to local laws and regulations of each country.', 'idta-pdf' ); ?><br>
-		<?php esc_html_e( 'The issuing authority bears no responsibility for refusal by local authorities.', 'idta-pdf' ); ?>
+		<?php esc_html_e( 'This International Driving Permit is issued in accordance with the United Nations Conventions on Road Traffic of 1949 and 1968. Acceptance of this permit is subject to local laws and regulations of each country. The issuing authority bears no responsibility for refusal by local authorities', 'idta-pdf' ); ?><br>
 	</p>
 </div>
 
