@@ -121,8 +121,15 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 		<?php esc_html_e( 'Authorized signature of Empowered Authority', 'idta-pdf' ); ?>
 	</p>
 
-	<?php if ( '' !== $context['permit_qr'] ) : ?>
-		<img class="idta-cover__qr" src="<?php echo esc_attr( $context['permit_qr'] ); ?>" alt="">
+	<?php
+	/*
+	 * A fixed mark, not a generated QR code. The cover carries nothing
+	 * order-specific to encode — the scannable, per-permit code is the one on
+	 * the holder details page — so this is plain artwork.
+	 */
+	?>
+	<?php if ( '' !== $context['verify'] ) : ?>
+		<img class="idta-cover__qr" src="<?php echo esc_attr( $context['verify'] ); ?>" alt="">
 	<?php endif; ?>
 
 	<p class="idta-cover__order"><?php echo esc_html( $context['card_number'] ); ?></p>

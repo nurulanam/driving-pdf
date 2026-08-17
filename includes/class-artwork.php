@@ -43,6 +43,10 @@ final class Artwork {
 		// Cover: the plain seal, then the authorised signature beneath it.
 		'cover_logo' => 'assets/img/cover-logo.png',
 		'signature'  => 'assets/img/idta-signature.png',
+		// Cover: a fixed verification mark. Unlike the holder page's QR, this one
+		// carries nothing order-specific, so it is artwork rather than a code
+		// generated per permit.
+		'verify'     => 'assets/img/verify.png',
 		// The horizontal lockup, used on the language index.
 		'logo'       => 'assets/img/Idta logo.png',
 		// Holder page: stamped across the corner of the portrait.

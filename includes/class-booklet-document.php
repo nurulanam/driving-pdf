@@ -121,6 +121,7 @@ final class Booklet_Document extends Document {
 
 		foreach ( array(
 			'cover_logo'     => 'cover_logo',
+			'verify'         => 'verify',
 			'logo'           => 'logo',
 			'authority_sign' => 'signature',
 			'stamp'          => 'stamp',
