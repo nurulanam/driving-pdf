@@ -42,91 +42,106 @@
 
 /* ---- Cover ---- */
 
+/**
+ * Every size and gap below is measured off the reference cover (1.jpg), which
+ * is set in these same DejaVu faces. Margins are ink-gap minus the line-box
+ * overhead above and below the type, so they are not round numbers.
+ *
+ * No bottom padding, deliberately. The stack already reaches 277.6mm of the
+ * 297mm page (page margins are zero), and with 19mm of padding under it the
+ * block came to 296.6mm — inside the page by less than half a millimetre. mPDF
+ * measures text a shade differently than the metrics these gaps were solved
+ * from, so that was enough to push the trailing padding onto a second, blank
+ * page. Nothing follows the legal note here, so the padding only ever bought a
+ * page break.
+ */
 .idta-cover {
 	text-align: center;
 	font-family: dejavuserif;
-	padding: 20mm 15mm 10mm 15mm;
+	padding: 25mm 15mm 0 15mm;
 }
 
 .idta-cover__association {
 	font-size: 12pt;
 	font-weight: bold;
-	margin: 0 0 12mm 0;
+	margin: 0 0 7.6mm 0;
 }
 
 .idta-cover__title {
 	font-size: 28pt;
 	font-weight: bold;
-	margin: 0 0 8mm 0;
+	margin: 0 0 6.7mm 0;
 	line-height: 1.2;
 }
 
-.idta-cover__convention {
-	font-family: dejavusans;
-	font-size: 14pt;
-	font-weight: 500;
-	text-decoration: underline;
-	margin: 0 0 8mm 0;
-}
-
+/* The side margins set the wrap: 150mm breaks after "Shown", as printed. */
 .idta-cover__notice {
 	font-family: dejavusans;
 	font-size: 14pt;
 	font-weight: bold;
 	line-height: 1.4;
-	margin: 0 10mm 10mm 10mm;
+	margin: 0 15mm 11.1mm 15mm;
 }
 
+/**
+ * The reference sets this line in a condensed bold, which the plugin does not
+ * bundle. Matched on cap height instead — the size the eye reads — so "Date:"
+ * prints about 1.5mm wider than the reference at the same apparent size.
+ */
 .idta-cover__expiry {
 	font-family: dejavusans;
-	font-size: 14pt;
+	font-size: 17pt !important;
 	font-weight: bold;
-	margin: 0 0 10mm 0;
+	margin: 0 0 12.8mm 0;
 }
 
 .idta-cover__expiry-value {
 	display: inline-block;
-	width: 70mm;
+	font-size: 17pt;
+	width: 77mm;
 	margin-left: 3mm;
-	border-bottom: 0.3mm solid #000000;
+	border-bottom: 0.3mm dashed #000000;
 	text-align: center;
 }
 
+/**
+ * The seal and the iAA lockup are one tall file (450 x 800), so the width sets
+ * the height too: at 60mm this printed 107mm tall and pushed the legal note off
+ * the page.
+ */
 .idta-cover__logo {
-	width: 60mm;
-	margin: 0 0 4mm 0;
+	width: 45mm;
+	margin: 0 0 15.5mm 0;
+	vertical-align: top;
 }
 
 .idta-cover__authority img {
-	width: 32mm;
-	margin-bottom: 1mm;
+	width: 53mm;
+	margin-bottom: 2.5mm;
+	vertical-align: top;
 }
 
 .idta-cover__authority-label {
 	font-family: dejavusans;
-	font-size: 11pt;
-	margin: 0 0 6mm 0;
+	font-size: 12pt;
+	margin: 0 0 5.5mm 0;
 }
 
 .idta-cover__qr {
-	width: 40mm;
-	height: 40mm;
+	width: 27.5mm;
+	vertical-align: top;
 }
 
-.idta-cover__order {
-	font-size: 11pt;
-	font-weight: bold;
-	margin: 2mm 0 4mm 0;
-}
-
+/**
+ * Three centred lines, as printed. The side margins are load-bearing: they hold
+ * the wrap to 170mm, and at the full 180mm content width the first line took
+ * "Traffic" up with it and all three breaks moved.
+ */
 .idta-cover__legal {
-	font-size: 7pt;
-	line-height: 1.3;
-	margin: 0;
-	padding-top: 5mm;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	font-size: 9pt;
+	line-height: 1.55;
+	margin: 0 5mm;
+	padding-top: 3.35mm;
 }
 
 /* ---- Holder details page ---- */
@@ -289,12 +304,6 @@
 	margin: 0;
 }
 
-.idta-exclusions__subtitle {
-	text-align: center;
-	font-size: 10pt;
-	margin: 0 0 4mm 0;
-}
-
 /**
  * Four columns, being two numeral/rule pairs. The rule is the cell's own bottom
  * border — mPDF draws nothing for an empty inline-block, so a bordered span left
@@ -373,31 +382,6 @@
  */
 .lp-body {
 	height: 268mm;
-}
-
-/* Language flag, drawn as table cells so it stays vector-only. */
-.lp-flag {
-	width: 7.2mm;
-	border-collapse: collapse;
-	border: 0.15mm solid #999999;
-	float: right;
-}
-
-.lp-flag__stripe {
-	width: 2.4mm;
-	height: 6mm;
-	padding: 0;
-}
-
-/* Real flag artwork. The bundled files are square, as the scans print them. */
-.lp-flag-box {
-	width: 6mm;
-	height: 6mm;
-	padding-top: 6mm;
-}
-
-.lp-flag-box__image {
-	width: 6mm;
 }
 
 /* ---- Header: lead lines left, numbered holder fields right ---- */
@@ -621,26 +605,6 @@
  * physical sides. Every horizontal side, float and alignment is flipped.
  */
 
-.lp--rtl .lp-flag {
-	float: right;
-}
-
-/**
- * The mirrored page's flag sits at the right edge.
- *
- * Aligned by widening the box to the content column and setting text-align,
- * not by `float: right`: mPDF drew the floated box at the left edge anyway, so
- * the Arabic flag stayed on the wrong side. Every other page keeps the
- * left-hand box above.
- */
-.lp--rtl .lp-flag-box {
-	width: 162mm;
-	height: auto;
-	text-align: right;
-	line-height: 0;
-	font-size: 0;
-}
-
 /* The label moves to the right of the rule, so its text goes with it. */
 .lp--rtl .lp-rule__label {
 	text-align: right;
@@ -711,12 +675,21 @@
 	text-align: right;
 }
 
-/* Shown in place of the flag when a tricolour strip would misrepresent it. */
+/**
+ * The language names its own page, where the flag used to sit. The padding is
+ * the gap the flag box carried above it, so the header below has not moved.
+ *
+ * Set in the page's own script font by the template, so a name reads in the
+ * language it heads.
+ */
 .lp-language {
-	font-size: 9pt;
+	font-size: 11pt;
+	font-weight: bold;
+	padding-top: 6mm;
 	height: 6mm;
 }
 
+/* Mirrored with the rest of the page. */
 .lp--rtl .lp-language {
 	text-align: right;
 }
@@ -783,24 +756,10 @@
 }
 
 /**
- * The same flag the language's own page prints, ahead of its name.
- *
  * Row spacing is the leader cell's height, not bottom padding on these cells: a
  * border is drawn outside the padding, so padding pushed the dotted rule 3.4mm
  * below the name it belongs to.
  */
-.index__flag {
-	width: 10mm;
-	padding: 0 3mm 0 0;
-	vertical-align: bottom;
-	line-height: 0;
-	font-size: 0;
-}
-
-.index__flag-image {
-	width: 6.5mm;
-}
-
 .index__language {
 	width: 54mm;
 	font-size: 13pt;
@@ -811,7 +770,7 @@
 }
 
 .index__leader {
-	width: 48mm;
+	width: 58mm;
 	height: 9.5mm;
 	border-bottom: 0.3mm dotted #000000;
 	padding: 0;
@@ -851,22 +810,37 @@
 	margin: 14mm -24mm 0 -24mm;
 }
 
+/**
+ * 954 x 383 with no padding around the dots, so 162mm sets the artwork 65.0mm
+ * tall and its dots land where the reference prints them.
+ *
+ * vertical-align keeps the line box to the image: on the baseline mPDF leaves
+ * descender space beneath an inline image, and every gap below it shifts.
+ */
 .back__map img {
 	width: 162mm;
+	vertical-align: top;
 }
 
+/**
+ * The lockup follows the map almost immediately. The gap looks impossibly
+ * small because the file carries its own padding: the artwork is the same
+ * 450 x 800 file the cover uses, whose ink starts 0.6% of the height in.
+ */
 .back__wordmark {
-	margin-top: 16mm;
+	margin-top: 0.2mm;
 }
 
 .back__wordmark img {
-	width: 52mm;
+	width: 45mm;
+	vertical-align: top;
 }
 
+/* One line, the web address. 1.5 line-height was spacing it off an email. */
 .back__contact {
-	font-size: 12pt;
-	line-height: 1.5;
-	margin: 12mm 0 0 0;
+	font-size: 14pt;
+	line-height: 1.2;
+	margin: 5mm 0 0 0;
 }
 
 /**
@@ -875,7 +849,7 @@
  */
 .back__marks {
 	width: 110mm;
-	margin: 40mm auto 0 auto;
+	margin: 20.9mm auto 0 auto;
 	border-collapse: collapse;
 }
 
@@ -890,6 +864,7 @@
 	width: 22mm;
 }
 
+/* 1515 x 1422 with a 1-3% margin baked in, so 25mm draws a 23.8mm emblem. */
 .back__emblem {
-	width: 26mm;
+	width: 25mm;
 }

@@ -4,7 +4,7 @@
  *
  * One layout, nineteen languages. Strings come from IDTA\PDF\Language_Pages;
  * this file only arranges them. A right-to-left language mirrors the whole
- * page — flag, letter column, stamp and divider all swap sides.
+ * page — name, letter column, stamp and divider all swap sides.
  *
  * Override by copying to `idta-pdf/pages/language-page.php` in your theme.
  *
@@ -126,35 +126,19 @@ $lp_rule = static function ( string $label, string $css, bool $rtl, float $total
 	echo '</div>';
 };
 
-/*
- * Real artwork wins. Failing that, a three-cell strip is only an honest
- * rendering of a vertical tricolour, so for every other flag the language is
- * named instead rather than drawing something that misrepresents a national
- * flag. Set `flag_image` (in the language data or through the
- * idta_pdf_language_pages filter) to print the real thing.
- */
-$lp_flag_image = (string) $page_lang['flag_image'];
-$lp_flag       = array_values( array_filter( (array) $page_lang['flag'], 'is_string' ) );
 ?>
 <div class="<?php echo esc_attr( $lp_class ); ?>"<?php echo $lp_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built with esc_attr(). ?>>
 
 <div class="lp-body">
 
-	<?php if ( '' !== $lp_flag_image ) : ?>
-		<div class="lp-flag-box">
-			<img class="lp-flag-box__image" src="<?php echo esc_attr( $lp_flag_image ); ?>" alt="">
-		</div>
-	<?php elseif ( 3 === count( $lp_flag ) ) : ?>
-		<table class="lp-flag">
-			<tr>
-				<?php foreach ( $lp_flag as $lp_stripe ) : ?>
-					<td class="lp-flag__stripe" style="background-color: <?php echo esc_attr( $lp_stripe ); ?>;"></td>
-				<?php endforeach; ?>
-			</tr>
-		</table>
-	<?php else : ?>
-		<div class="lp-language"<?php echo $lp_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built with esc_attr(). ?>><?php echo esc_html( (string) $page_lang['label'] ); ?></div>
-	<?php endif; ?>
+	<?php
+	/*
+	 * The language names its own page. This is where the flag used to print,
+	 * and it is set in the page's own script font so the name reads in the
+	 * language it heads.
+	 */
+	?>
+	<div class="lp-language"<?php echo $lp_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built with esc_attr(). ?>><?php echo esc_html( (string) $page_lang['label'] ); ?></div>
 
 	<?php
 	/**

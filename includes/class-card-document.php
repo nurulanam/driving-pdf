@@ -117,6 +117,15 @@ final class Card_Document extends Document {
 	protected function context(): array {
 		$context = parent::context();
 
+		/*
+		 * The two generated codes, built here rather than in Document::context()
+		 * because the card is the only document that prints them: the booklet
+		 * carries a fixed verification mark on both its cover and its holder
+		 * page, and was paying to build and embed two QR images it never drew.
+		 */
+		$context['permit_qr']  = $this->qr->permit_qr( $this->data );
+		$context['details_qr'] = $this->qr->details_qr( $this->data );
+
 		$context['front_background'] = $this->images->embed( Artwork::card( 'front', $this ) );
 		$context['back_background']  = $this->images->embed( Artwork::card( 'back', $this ) );
 		$context['stamp']            = $this->images->embed( Artwork::card( 'stamp', $this ) );

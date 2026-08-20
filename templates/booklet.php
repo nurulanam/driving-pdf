@@ -89,21 +89,19 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 <div class="<?php echo esc_attr( $page_class( 'idta-cover' ) ); ?>">
 
 	<p class="idta-cover__association">
-		<?php esc_html_e( 'INTERNATIONAL DRIVING PERMIT ASSOCIATION', 'idta-pdf' ); ?>
+		<?php esc_html_e( 'INTERNATIONAL AUTOMOBILE AGENCY', 'idta-pdf' ); ?>
 	</p>
 
 	<h1 class="idta-cover__title">
 		<?php esc_html_e( 'International Driving Permit', 'idta-pdf' ); ?>
 	</h1>
 
-	<p class="idta-cover__convention"><?php echo esc_html( $context['convention'] ); ?></p>
-
 	<p class="idta-cover__notice">
-		<?php esc_html_e( 'IMPORTANT — This Permit is Only Valid When Shown With Your Domestic Driver\'s Licence', 'idta-pdf' ); ?>
+		<?php esc_html_e( 'IMPORTANT: This Permit is Only Valid When Shown With Your Domestic Driver\'s Licence', 'idta-pdf' ); ?>
 	</p>
 
 	<div class="idta-cover__expiry">
-		<span><?php esc_html_e( 'Expires on:', 'idta-pdf' ); ?></span>
+		<span><?php esc_html_e( 'Date:', 'idta-pdf' ); ?></span>
 		<span class="idta-cover__expiry-value"><?php echo esc_html( $context['expiry_date'] ); ?></span>
 	</div>
 
@@ -132,10 +130,8 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 		<img class="idta-cover__qr" src="<?php echo esc_attr( $context['verify'] ); ?>" alt="">
 	<?php endif; ?>
 
-	<p class="idta-cover__order"><?php echo esc_html( $context['card_number'] ); ?></p>
-
 	<p class="idta-cover__legal">
-		<?php esc_html_e( 'This International Driving Permit is issued in accordance with the United Nations Conventions on Road Traffic of 1949 and 1968. Acceptance of this permit is subject to local laws and regulations of each country. The issuing authority bears no responsibility for refusal by local authorities', 'idta-pdf' ); ?><br>
+		<?php esc_html_e( 'This International Driving Permit is issued in accordance with the United Nations Conventions on Road Traffic of 1949 and 1968. Acceptance of this permit is subject to local laws and regulations of each country. The issuing authority bears no responsibility for refusal by local authorities.', 'idta-pdf' ); ?>
 	</p>
 </div>
 
@@ -226,11 +222,17 @@ endforeach;
 			<div class="idta-holder__rule"></div>
 
 			<p class="idta-holder__signature-label">
-				<?php esc_html_e( 'Signature du titulaire*', 'idta-pdf' ); ?>
+				<?php esc_html_e( 'Signature of the holder', 'idta-pdf' ); ?>
 			</p>
 
-			<?php if ( '' !== $context['details_qr'] ) : ?>
-				<img class="idta-holder__qr" src="<?php echo esc_attr( $context['details_qr'] ); ?>" alt="">
+			<?php
+			/*
+			 * The same fixed mark the cover carries, not a generated code. The
+			 * booklet encodes nothing order-specific, so no QR is built for it.
+			 */
+			?>
+			<?php if ( '' !== $context['verify'] ) : ?>
+				<img class="idta-holder__qr" src="<?php echo esc_attr( $context['verify'] ); ?>" alt="">
 			<?php endif; ?>
 		</div>
 
@@ -238,8 +240,7 @@ endforeach;
 	</div>
 
 	<div class="idta-exclusions">
-		<p class="idta-exclusions__title"><?php esc_html_e( 'EXCLUSIONS', 'idta-pdf' ); ?></p>
-		<p class="idta-exclusions__subtitle"><?php esc_html_e( '(pays)', 'idta-pdf' ); ?></p>
+		<p class="idta-exclusions__title"><?php esc_html_e( 'EXCLUSIONS (pays)', 'idta-pdf' ); ?></p>
 
 		<?php
 		/*
@@ -261,7 +262,7 @@ endforeach;
 			<?php endfor; ?>
 		</table>
 
-		<p class="idta-exclusions__note"><?php esc_html_e( '*Ou l\'empreinte du pouce', 'idta-pdf' ); ?></p>
+		<p class="idta-exclusions__note"><?php esc_html_e( '*Or the thumbprint', 'idta-pdf' ); ?></p>
 	</div>
 </div>
 

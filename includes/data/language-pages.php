@@ -74,13 +74,13 @@ return array(
 		'categories'  => array(
 			'A' => 'Motorcycles, with or without a sidecar, invalid carriages and three-wheeled motor vehicles with an unloaded weight not exceeding 400 kg (900 lbs)',
 			'B' => 'Motor vehicles used for the transport of passengers and comprising, in addition to the driver\'s seat, at most eight seats, or those used for the transport of goods and having permissible maximum weight not exceeding 3,500 kg (7,700 lbs.). Vehicles in this category may be coupled with a light trailer.',
-			'C' => 'Motor vehicles used for the transport of goods and of which the permissible maximum weight exceeds 3,500 kg (7,700 lbs.). Vehicles in this category may be coupled with light trailer.',
+			'C' => 'Motor vehicles used for the transport of goods and of which the permissible maximum weight exceeds 3,500 kg (7,700 lbs.). Vehicles in this category may be coupled with a light trailer.',
 			'D' => 'Motor vehicles used for the transport of passengers and comprising, in addition to the driver\'s seat, more than eight seats. Vehicles in this category may be coupled with a light trailer.',
 			'E' => 'Motor vehicles of categories B, C, or D, as authorized above, with other than a light trailer.',
 		),
 		'notes'       => array(
 			'"Permissible maximum weight" of a vehicle means the weight of the vehicle and its maximum load when the vehicle is ready for the road. "Maximum load" means the weight of the load declared by the competent authority of the',
-			'country of registrations of the vehicle. "Light Trailers" shall be those of a permissible maximum weight not exceeding 750 kg (1650 lbs.).',
+			'country of registrations of the vehicle. "Light Trailers" shall be those of a permissible maximum weight not exceeding 750 kg (1,650 lbs.).',
 		),
 		'exclusion'   => array(
 			'title'     => 'EXCLUSION',

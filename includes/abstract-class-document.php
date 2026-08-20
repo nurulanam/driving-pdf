@@ -339,8 +339,6 @@ abstract class Document {
 			'signature'       => $this->images->embed( $this->data->signature() ),
 			'license_front'   => $this->images->embed( $this->data->license_front() ),
 			'license_back'    => $this->images->embed( $this->data->license_back() ),
-			'permit_qr'       => $this->qr->permit_qr( $this->data ),
-			'details_qr'      => $this->qr->details_qr( $this->data ),
 			'all_categories'  => Order_Data::CATEGORIES,
 		);
 

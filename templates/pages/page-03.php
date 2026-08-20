@@ -6,7 +6,7 @@
  *
  * The rows come from $context['languages'], the same list the translation pages
  * are built from, so the index cannot drift out of step with them: add a language
- * there and it appears here, in page order, with its own flag and printed folio.
+ * there and it appears here, in page order, with its printed folio.
  *
  * Override by copying to `idta-pdf/pages/page-03.php` in your theme.
  *
@@ -43,15 +43,6 @@ ksort( $index_pages );
 			$index_font = sprintf( ' style="font-family: %s;"', esc_attr( (string) $index_entry['font'] ) );
 			?>
 			<tr>
-				<?php
-				/*
-				 * Emitted without surrounding whitespace: a newline either side of
-				 * the image becomes a second line box in the cell, which deepens
-				 * the row and drops the dotted leader below the name beside it.
-				 */
-				$index_flag = (string) $index_entry['flag_image'];
-				?>
-				<td class="index__flag"><?php if ( '' !== $index_flag ) : ?><img class="index__flag-image" src="<?php echo esc_attr( $index_flag ); ?>" alt=""><?php endif; ?></td>
 				<td class="index__language"<?php echo $index_font; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built with esc_attr(). ?>><?php echo esc_html( $index_label ); ?></td>
 				<td class="index__leader"></td>
 				<td class="index__folio"><?php echo esc_html( str_pad( $index_folio, 2, '0', STR_PAD_LEFT ) ); ?></td>

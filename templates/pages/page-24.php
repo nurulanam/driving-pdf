@@ -5,8 +5,8 @@
  * A text and artwork rebuild of `assets/img/pages/final-booklet-IDPA_page-0024.jpg`,
  * the last page that was still a full-page scan.
  *
- * Reproduces the scan's dotted world map, then the lockup, the contact details,
- * and the row of the two QR codes either side of the UN emblem.
+ * Reproduces the scan's dotted world map, then the lockup, the web address, and
+ * the row of the two QR codes either side of the UN emblem.
  *
  * Override by copying to `idta-pdf/pages/page-24.php` in your theme.
  *
@@ -55,10 +55,7 @@ $back_marks = array(
 		</div>
 	<?php endif; ?>
 
-	<p class="back__contact">
-		<?php echo esc_html( (string) $context['brand_site'] ); ?><br>
-		<?php echo esc_html( (string) $context['brand_email'] ); ?>
-	</p>
+	<p class="back__contact"><?php echo esc_html( (string) $context['brand_site'] ); ?></p>
 
 	<table class="back__marks">
 		<tr>

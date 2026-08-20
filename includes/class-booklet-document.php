@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 final class Booklet_Document extends Document {
 
 	/**
-	 * Memoised language definitions with their flag artwork resolved.
+	 * Memoised language definitions, keyed by booklet page number.
 	 *
 	 * @var array<int,array<string,mixed>>|null
 	 */
@@ -102,8 +102,8 @@ final class Booklet_Document extends Document {
 	protected function context(): array {
 		$context = parent::context();
 
-		// The index page needs the same flags the translation pages print, so the
-		// languages are resolved once and shared rather than embedded twice.
+		// The index and the translation pages are built from one list, so they
+		// cannot drift out of step.
 		$context['languages'] = $this->languages();
 
 		/*
@@ -135,28 +135,17 @@ final class Booklet_Document extends Document {
 		}
 
 		/**
-		 * Filters the contact details printed on the back cover.
+		 * Filters the web address printed on the back cover.
 		 *
-		 * @param string $site Website, without a scheme.
+		 * @param string $site Website, as printed.
 		 */
-		$context['brand_site'] = (string) apply_filters( 'idta_pdf_brand_site', 'idta.com' );
-
-		/**
-		 * Filters the support address printed on the back cover.
-		 *
-		 * @param string $email Support address.
-		 */
-		$context['brand_email'] = (string) apply_filters( 'idta_pdf_brand_email', 'support@idta.com' );
+		$context['brand_site'] = (string) apply_filters( 'idta_pdf_brand_site', 'www.e-iaa.com' );
 
 		return $context;
 	}
 
 	/**
-	 * Language definitions with their flag artwork resolved, keyed by page number.
-	 *
-	 * Flags are declared as a path or URL; resolving them here means the templates
-	 * only ever deal with something the engine can read locally, and the index page
-	 * and the translation pages cannot end up with different artwork.
+	 * Language definitions, keyed by booklet page number.
 	 *
 	 * @return array<int,array<string,mixed>>
 	 */
@@ -167,15 +156,14 @@ final class Booklet_Document extends Document {
 
 		$this->languages = array();
 
+		/*
+		 * The flags are no longer printed — the translation pages and the index
+		 * are both headed by the language's name instead — so nothing here
+		 * resolves or embeds them. That mattered: every flag was base64'd into
+		 * the HTML on each render, nineteen of them, to be laid out and never
+		 * drawn.
+		 */
 		foreach ( Language_Pages::all() as $number => $language ) {
-			$flag = (string) $language['flag_image'];
-
-			if ( '' === $flag ) {
-				$flag = Artwork::flag( (string) $language['label'] );
-			}
-
-			$language['flag_image'] = '' === $flag ? '' : $this->images->embed( $flag );
-
 			$this->languages[ $number ] = $language;
 		}
 
@@ -221,8 +209,7 @@ final class Booklet_Document extends Document {
 				continue;
 			}
 
-			// Otherwise a translation page renders from the shared layout, with the
-			// flag artwork already resolved by languages().
+			// Otherwise a translation page renders from the shared layout.
 			$language = $this->languages()[ $number ] ?? null;
 
 			if ( null !== $language ) {
