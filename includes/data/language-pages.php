@@ -25,11 +25,12 @@
  *                  garuda         Thai
  *                Register your own with the `idta_pdf_font_data` filter and
  *                name it here.
- *   weight       'bold' asks mPDF to thicken the face. The bundled CJK and
- *                Ethiopic fonts ship in one hairline weight, which prints far
- *                lighter than the scans; mPDF strokes the outline to fake the
- *                missing bold, which is what closes that gap.
- *   rtl          true mirrors the whole page (flag, letter column, stamp, divider).
+ *   weight       'bold' asks mPDF to thicken the face. No page uses it: the
+ *                bundled CJK and Ethiopic fonts ship in one hairline weight, so
+ *                mPDF fakes bold by stroking the outline, and on the Chinese,
+ *                Japanese and Korean pages that printed visibly heavier and
+ *                wider than the Latin pages beside them.
+ *   rtl          true mirrors the whole page (name, letter column, stamp, divider).
  *   flag         Three colours for a vertical tricolour strip, or array() to
  *                print the language name instead. A three-stripe block is only
  *                an honest rendering of an actual vertical tricolour.
@@ -570,7 +571,6 @@ return array(
 		'label'       => '中文',
 		'folio'       => '5',
 		'font'        => 'sun-exta',
-		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '驾驶员资料：',
 		'lead_valid'  => '本许可证适用的车辆类别：',
@@ -611,7 +611,6 @@ return array(
 		'label'       => '日本語',
 		'folio'       => '16',
 		'font'        => 'sun-exta',
-		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '運転者に関する事項:',
 		'lead_valid'  => '本許可証が有効な車両:',
@@ -654,7 +653,7 @@ return array(
 		// FreeSerif reads as a cleaner book face for Ethiopic than Abyssinica
 		// SIL's heavier, rounder default; freeserif's bold variant (unlike its
 		// regular) has no Ethiopic glyphs at all, so this page must stay at the
-		// default normal weight rather than asking for bold like the CJK pages.
+		// default normal weight.
 		'font'        => 'freeserif',
 		'flag'        => array(),
 		'lead_driver' => 'የአሽከርካሪ መረጃ:',
@@ -696,7 +695,6 @@ return array(
 		'label'       => '한국어',
 		'folio'       => '19',
 		'font'        => 'unbatang',
-		'weight'      => 'bold',
 		'flag'        => array(),
 		'lead_driver' => '운전자에 관한 사항:',
 		'lead_valid'  => '허가증이 유효한 차량:',

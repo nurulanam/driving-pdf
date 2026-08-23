@@ -101,7 +101,7 @@ $page_class = static function ( string $extra = '' ) use ( &$idta_page_number ):
 	</p>
 
 	<div class="idta-cover__expiry">
-		<span><?php esc_html_e( 'Date:', 'idta-pdf' ); ?></span>
+		<span class="idta-cover__expiry-label"><?php esc_html_e( 'Date:', 'idta-pdf' ); ?></span>
 		<span class="idta-cover__expiry-value"><?php echo esc_html( $context['expiry_date'] ); ?></span>
 	</div>
 

@@ -95,9 +95,25 @@
 	margin: 0 0 12.8mm 0;
 }
 
+/**
+ * The label and the value take their type from one declaration, so they cannot
+ * be set to different sizes.
+ *
+ * Both need it stated outright. The base stylesheet carries
+ * `p, li, td, th, div, span { font-size: <base>pt }`, which matches a bare
+ * <span> directly — so the label was never inheriting this line's 17pt, it was
+ * being set to the 10pt base and printing markedly smaller than the value
+ * beside it. Nothing here may rely on inheritance into an inline element.
+ */
+.idta-cover__expiry-label,
+.idta-cover__expiry-value {
+	font-family: dejavusans;
+	font-size: 17pt !important;
+	font-weight: bold;
+}
+
 .idta-cover__expiry-value {
 	display: inline-block;
-	font-size: 17pt;
 	width: 77mm;
 	margin-left: 3mm;
 	border-bottom: 0.3mm dashed #000000;
@@ -148,12 +164,15 @@
 
 /**
  * The holder page must fit within 297mm including its own padding, or mPDF
- * spills the trailing padding onto a blank following page. The block sizes
- * below are budgeted to total roughly 230mm, leaving deliberate headroom for
- * longer names and taller artwork.
+ * spills the trailing padding onto a blank following page.
+ *
+ * The blocks below now total about 286mm, so the bottom padding is deliberately
+ * small: it is the trailing padding that spills, and there is no longer room to
+ * keep 12mm of it. Roughly 11mm of headroom is left for a longer name or taller
+ * artwork.
  */
 .idta-holder {
-	padding: 20mm 18mm 12mm;
+	padding: 20mm 18mm 6mm;
 }
 
 .idta-holder__fields {
@@ -166,7 +185,7 @@
 	display: block;
 	width: 100%;
 	border-bottom: 0.25mm dashed #000000;
-	padding: 0 0 0.8mm 0;
+	padding: 0 0 1.8mm 0;
 	margin: 0 0 2.4mm 0;
 }
 
@@ -197,40 +216,56 @@
 }
 
 .idta-category__box {
-	width: 19mm;
-	height: 19mm;
+	width: 21mm;
+	height: 21mm;
 	border: 0.3mm solid #000000;
 	padding: 2mm;
-	font-size: 12pt;
+	font-size: 13pt;
 	font-weight: bold;
 }
 
+/**
+ * Pulled back up over its box. The offset is the seal's height less the 0.5mm
+ * it deliberately overhangs the box's bottom edge, and the left margin centres
+ * it in the 25.6mm box, so both track the sizes above.
+ */
 .idta-category__seal {
-	width: 17mm;
-	height: 17mm;
-	margin-top: -16.5mm;
-	margin-left: 3mm;
+	width: 19mm;
+	height: 19mm;
+	margin-top: -18.5mm;
+	margin-left: 3.3mm;
 }
 
 .idta-category__granted {
 	font-size: 8pt;
 	font-weight: bold;
-	margin-top: -13mm;
-	margin-left: 5mm;
+	margin-top: -14mm;
+	margin-left: 5.5mm;
 	color: #3b016f;
 }
 
 /* ---- Portrait, signature and QR ---- */
 
+/**
+ * Bottom-aligned against the category column: the QR's lower edge sits level
+ * with the last seal's.
+ *
+ * The padding is that alignment. mPDF has no flexbox and will not stretch a
+ * float, so the only way to push this column down is to reserve space above it.
+ * 9.8mm was measured off a render, not calculated — the box model here defeated
+ * three attempts at arithmetic. Re-measure rather than re-derive if a size in
+ * either column changes, and note that .idta-holder__signature below must keep
+ * a fixed height for the result to hold.
+ */
 .idta-holder__identity {
 	float: right;
 	width: 90mm;
 	text-align: center;
-	padding-top: 6mm;
+	padding-top: 9.8mm;
 }
 
 .idta-holder__photo {
-	width: 50mm;
+	width: 56mm;
 	margin: 0 auto;
 }
 
@@ -241,7 +276,7 @@
  * width is set here.
  */
 .idta-holder__portrait {
-	width: 50mm;
+	width: 56mm;
 }
 
 /**
@@ -257,23 +292,29 @@
  */
 .idta-holder__stamp-box {
 	text-align: left;
-	margin-top: -11mm;
+	margin-top: -12mm;
 	line-height: 0;
 	font-size: 0;
 }
 
 .idta-holder__stamp {
-	width: 22mm;
-	margin-left: -11mm;
+	width: 24mm;
+	margin-left: -12mm;
 }
 
+/**
+ * A fixed height, not a minimum. This block used to collapse from 21mm to 10mm
+ * on an order with no signature on file, which shortened the whole column and
+ * floated the QR 5mm clear of the last seal. The height holds the 45mm
+ * signature's 19mm frame, so the column is now the same height either way.
+ */
 .idta-holder__signature {
 	padding-top: 2mm;
-	min-height: 10mm;
+	height: 19mm;
 }
 
 .idta-holder__signature img {
-	width: 35mm;
+	width: 45mm;
 }
 
 .idta-holder__rule {
@@ -287,9 +328,11 @@
 	margin: 0 0 3mm 0;
 }
 
+/* vertical-align keeps the line box to the image, so no descender space is
+   left under the last thing in the column. */
 .idta-holder__qr {
 	width: 24mm;
-	height: 24mm;
+	vertical-align: top;
 }
 
 /* ---- Exclusions ---- */
@@ -682,9 +725,10 @@
  * Set in the page's own script font by the template, so a name reads in the
  * language it heads.
  */
+/* No font-weight here: the template writes the page's own weight inline, which
+   wins over this rule, so declaring one only misled. */
 .lp-language {
 	font-size: 11pt;
-	font-weight: bold;
 	padding-top: 6mm;
 	height: 6mm;
 }

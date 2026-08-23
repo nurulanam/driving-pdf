@@ -84,10 +84,10 @@ final class Mpdf_Renderer implements Renderer {
 			'margin_footer'    => 0,
 			'tempDir'          => $this->filesystem->temp_dir(),
 			'mode'             => 'utf-8',
-			// The bundled CJK and Ethiopic faces ship in a single hairline
-			// weight, so mPDF fakes bold by stroking the outline. Its default
-			// of 5 clogs small ideographs; 3 reads as the medium weight the
-			// scanned pages are set in without filling the counters.
+			// Where a hairline face has no bold, mPDF fakes one by stroking the
+			// outline. No language page asks for bold any more, but markup or
+			// operator CSS still can: its default of 5 clogs small ideographs,
+			// where 3 thickens a face without filling the counters.
 			'falseBoldWeight'  => 3,
 			// Every asset is embedded as a data URI, so the engine never needs
 			// to make its own outbound request.
