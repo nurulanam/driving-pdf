@@ -105,8 +105,9 @@ final class Generator {
 		$data = new Order_Data( $order );
 
 		$map = array(
-			'booklet' => Booklet_Document::class,
-			'card'    => Card_Document::class,
+			'booklet'    => Booklet_Document::class,
+			'card'       => Card_Document::class,
+			'print-copy' => Print_Copy_Document::class,
 		);
 
 		$documents = array();
@@ -143,7 +144,7 @@ final class Generator {
 	 * @return string[]
 	 */
 	private function requested_documents( Order_Data $data ): array {
-		$both   = array( 'booklet', 'card' );
+		$both   = array( 'booklet', 'card', 'print-copy' );
 		$format = $data->format();
 
 		if ( '' === $format ) {
@@ -153,10 +154,15 @@ final class Generator {
 		$wants_card    = str_contains( $format, 'card' );
 		$wants_booklet = str_contains( $format, 'booklet' ) || str_contains( $format, 'book' );
 
+		/*
+		 * The print copy follows the booklet: it is an overlay of the booklet's
+		 * own cover and holder page, so a card-only order has nothing for it to
+		 * register against.
+		 */
 		if ( $wants_card && ! $wants_booklet ) {
 			$requested = array( 'card' );
 		} elseif ( $wants_booklet && ! $wants_card ) {
-			$requested = array( 'booklet' );
+			$requested = array( 'booklet', 'print-copy' );
 		} else {
 			$requested = $both;
 		}

@@ -63,7 +63,9 @@ final class Order_Admin {
 	 * @return string
 	 */
 	public function generate_one_url( \WC_Order $order, string $slug ): string {
-		return wp_nonce_url(
+		return add_query_arg(
+			'_wpnonce',
+			wp_create_nonce( 'idta-pdf-generate-one' ),
 			add_query_arg(
 				array(
 					'action'   => 'idta_pdf_generate_one',
@@ -71,8 +73,7 @@ final class Order_Admin {
 					'slug'     => $slug,
 				),
 				admin_url( 'admin-post.php' )
-			),
-			'idta-pdf-generate-one'
+			)
 		);
 	}
 
@@ -87,15 +88,16 @@ final class Order_Admin {
 	 * @return string
 	 */
 	public function regenerate_url( \WC_Order $order ): string {
-		return wp_nonce_url(
+		return add_query_arg(
+			'_wpnonce',
+			wp_create_nonce( 'idta-pdf-regenerate' ),
 			add_query_arg(
 				array(
 					'action'   => 'idta_pdf_regenerate',
 					'order_id' => $order->get_id(),
 				),
 				admin_url( 'admin-post.php' )
-			),
-			'idta-pdf-regenerate'
+			)
 		);
 	}
 
@@ -139,8 +141,9 @@ final class Order_Admin {
 		$error     = $order->get_meta( Generator::ERROR_META, true );
 
 		$labels = array(
-			'booklet' => __( 'Permit booklet (A4)', 'idta-pdf' ),
-			'card'    => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
+			'booklet'    => __( 'Permit booklet (A4)', 'idta-pdf' ),
+			'card'       => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
+			'print-copy' => __( 'Permit print (A5)', 'idta-pdf' ),
 		);
 
 		echo '<ul style="margin:0 0 12px;">';

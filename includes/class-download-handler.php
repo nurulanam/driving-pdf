@@ -86,7 +86,11 @@ final class Download_Handler {
 			$args['force'] = 1;
 		}
 
-		return wp_nonce_url( add_query_arg( $args, admin_url( 'admin.php' ) ), 'idta-pdf-download' );
+		return add_query_arg(
+			'_wpnonce',
+			wp_create_nonce( 'idta-pdf-download' ),
+			add_query_arg( $args, admin_url( 'admin.php' ) )
+		);
 	}
 
 	/**
@@ -236,8 +240,9 @@ final class Download_Handler {
 		}
 
 		$labels = array(
-			'booklet' => __( 'Download permit', 'idta-pdf' ),
-			'card'    => __( 'Download card', 'idta-pdf' ),
+			'booklet'    => __( 'Download permit', 'idta-pdf' ),
+			'card'       => __( 'Download card', 'idta-pdf' ),
+			'print-copy' => __( 'Download permit print', 'idta-pdf' ),
 		);
 
 		foreach ( $this->generator->generated_documents( $order ) as $slug => $path ) {

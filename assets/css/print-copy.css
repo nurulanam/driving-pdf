@@ -1,0 +1,186 @@
+/**
+ * Print copy: A4, an overlay for pre-printed booklet stock.
+ *
+ * Registered against the stock itself — assets/img/page-01.jpg and
+ * page-23.jpg, read as A5 pages — not derived from booklet.css. That matters:
+ * the stock's field rules are 6.81mm apart where the booklet sets its own
+ * 10.64mm apart at A4, so anything taken from the booklet walks off the printed
+ * lines by the third row.
+ *
+ * A5, matching the stock, so the printer scales nothing. The two reference
+ * images are stored at A4 pixel dimensions but represent A5 pages, so every
+ * figure below was measured at 148/2481 mm per pixel across and 210/3508 down.
+ *
+ * Nothing here is inherited or proportional. Every offset below is a measured
+ * position on the stock, reached by a spacer of known height, because mPDF has
+ * no absolute positioning. The vertical chain is:
+ *
+ *   .pc-values   ends at exactly 56.55mm, so the row beneath it starts there
+ *   .pc-seals    left column, the five category boxes
+ *   .pc-ident    right column, portrait, stamp and signature
+ *
+ * Values sit ON their rules: a block's baseline is its top plus half-leading
+ * plus the ascender, so each row's top is solved backwards from the rule the
+ * value has to sit on.
+ */
+
+.pc-page {
+	width: 148mm;
+	height: 210mm;
+	position: relative;
+	font-family: dejavuserif;
+	color: #000000;
+}
+
+.pc-page--break {
+	page-break-before: always;
+}
+
+/* A leaf that prints nothing, so the next overlay lands on the right side. */
+.pc-blank {
+	width: 148mm;
+	height: 210mm;
+}
+
+/* ---- Page 2: the expiry date ---- */
+
+/**
+ * The stock's dashed rule runs x 53.77-107.91mm with its "Date:" label to the
+ * left, and the rule sits at y 61.16mm. The value is centred over the rule with
+ * its baseline just above it.
+ *
+ * 14.14pt is the booklet's 17pt taken to this page's scale and then enlarged,
+ * and the baseline is 1.06mm clear of the rule rather than sitting on it.
+ */
+.pc-date {
+	padding-top: 55.38mm;
+	padding-left: 53.77mm;
+	margin: 0;
+}
+
+.pc-date__value {
+	width: 54.13mm;
+	font-size: 14.14pt;
+	font-weight: bold;
+	line-height: 1.2;
+	text-align: center;
+}
+
+/* ---- Page 4: the numbered values ---- */
+
+/**
+ * Six rows, one per printed rule at 19.10, 25.86, 32.69, 39.51, 46.33 and
+ * 53.16mm.
+ *
+ * The block's height is fixed so the row below starts at a known place: the
+ * 15.67mm lead-in plus six rows of 6.812mm comes to 56.55mm.
+ */
+.pc-values {
+	padding-top: 15.67mm;
+	margin: 0;
+}
+
+/**
+ * 2.92mm of margin under a 3.89mm line box gives the stock's 6.812mm pitch.
+ * The left padding clears the printed numeral, which ends at 15.33mm.
+ */
+.pc-value {
+	padding-left: 17.6mm;
+	margin: 0 0 2.92mm 0;
+	font-size: 9.19pt;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+/* ---- Page 4: the two columns beneath ---- */
+
+.pc-row {
+	width: 148mm;
+}
+
+/**
+ * The category boxes, x 12.71-29.83mm on the stock. The columns are floats and
+ * must total well under 148mm: mPDF drops the second onto its own line if they
+ * crowd the width. 31 + 111 = 142mm.
+ */
+.pc-seals {
+	float: left;
+	width: 31mm;
+}
+
+/**
+ * The first box runs y 59.27-76.03mm and they repeat every 18.27mm. A 14.8mm
+ * seal centred in that box starts 60.25mm down the page, so 3.70mm below this
+ * row's own top, and each one after it 18.27mm further.
+ */
+.pc-seal {
+	height: 18.27mm;
+	padding-left: 13.87mm;
+	line-height: 0;
+	font-size: 0;
+}
+
+.pc-seal--first {
+	padding-top: 3.7mm;
+}
+
+.pc-seal__img {
+	width: 14.8mm;
+	vertical-align: top;
+}
+
+/* ---- Page 4: portrait, stamp and signature ---- */
+
+.pc-ident {
+	float: left;
+	width: 111mm;
+	line-height: 0;
+	font-size: 0;
+}
+
+/**
+ * The portrait, shifted right to sit over the stock's open panel and centred on
+ * the signature rule below it (x 85.96-135.29mm, centre 110.63mm). 11.33mm of
+ * lead-in puts its top at 67.88mm.
+ */
+.pc-portrait {
+	padding-top: 11.33mm;
+	padding-left: 63.44mm;
+}
+
+.pc-portrait__img {
+	width: 32.42mm;
+	vertical-align: top;
+}
+
+/**
+ * Stamped across the portrait's lower-left corner, and larger in proportion
+ * than the booklet prints it. The negative margin reaches back over the
+ * portrait's last 8.48mm.
+ */
+.pc-stamp {
+	margin-top: -8.48mm;
+	padding-left: 59.21mm;
+}
+
+.pc-stamp__img {
+	width: 18.32mm;
+	vertical-align: top;
+}
+
+/**
+ * On the stock's dashed signature rule at y 128.77mm.
+ *
+ * The margin carries a correction the block arithmetic does not: the signature
+ * artwork has its own bottom padding, so a nominal offset left its ink well
+ * clear of the line. Measured off a render against the stock.
+ */
+.pc-sign {
+	margin-top: 5.3mm;
+	padding-left: 57.8mm;
+}
+
+.pc-sign__img {
+	width: 35.24mm;
+	vertical-align: top;
+}

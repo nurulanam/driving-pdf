@@ -98,10 +98,9 @@ find "$stage/vendor" -type f \( -name '*.md' -o -name 'phpstan*' -o -name '*.dis
 
 # Two separate jobs here. The scans: page 24 is the only one still printed, and
 # the rest exist so the page list and the fallback stay intact, so they are
-# recompressed hard rather than removed. The card faces: shipped at 474dpi for an
-# 85.6mm card, which is most of why a generated card PDF weighs 4MB — enough to
-# be why email attachment is off by default. 356dpi is past what any printer will
-# use.
+# recompressed hard rather than removed. The card guilloche: shipped at about
+# 474dpi and embedded into every card, which is most of why a generated card PDF
+# was heavy enough that email attachment is off by default.
 if php -r 'exit( extension_loaded( "gd" ) ? 0 : 1 );'; then
 	STAGE="$stage" php -r '
 		$stage = getenv( "STAGE" );
@@ -119,18 +118,19 @@ if php -r 'exit( extension_loaded( "gd" ) ? 0 : 1 );'; then
 			imagedestroy( $image );
 		}
 
-		foreach ( array( "white-front.jpg", "white-back.jpg" ) as $name ) {
-			$file  = $stage . "/assets/img/" . $name;
-			$image = is_file( $file ) ? @imagecreatefromjpeg( $file ) : false;
+		/*
+		 * The card guilloche. Shipped at 1597px for an 85.6mm panel — about
+		 * 474dpi — and base64-embedded into every generated card, so it alone
+		 * accounted for most of the weight of a card PDF. 1100px is still over 300dpi.
+		 * Its alpha has to survive: the panel is semi-transparent and prints
+		 * muddy if flattened.
+		 */
+		$file  = $stage . "/assets/img/card/font-bottom-bg.png";
+		$image = is_file( $file ) ? @imagecreatefrompng( $file ) : false;
 
-			if ( false === $image ) {
-				continue;
-			}
-
-			$width = imagesx( $image );
-
-			if ( $width > 1200 ) {
-				$scaled = imagescale( $image, 1200 );
+		if ( false !== $image ) {
+			if ( imagesx( $image ) > 1100 ) {
+				$scaled = imagescale( $image, 1100 );
 
 				if ( false !== $scaled ) {
 					imagedestroy( $image );
@@ -138,7 +138,9 @@ if php -r 'exit( extension_loaded( "gd" ) ? 0 : 1 );'; then
 				}
 			}
 
-			imagejpeg( $image, $file, 82 );
+			imagealphablending( $image, false );
+			imagesavealpha( $image, true );
+			imagepng( $image, $file, 9 );
 			imagedestroy( $image );
 		}
 	'
@@ -147,8 +149,17 @@ else
 	echo "GD missing; artwork left as-is." >&2
 fi
 
-# Superseded by the .jpg card faces Artwork now points at.
-rm -f "$stage/assets/img/white-front.jpeg" "$stage/assets/img/white-back.jpeg"
+# The pre-composed card faces: both faces are now drawn from the parts in
+# assets/img/card, so nothing references these 3.8MB of artwork. The two card
+# reference renders are design sources, not shipped assets.
+rm -f "$stage/assets/img/white-front.jpg"  "$stage/assets/img/white-back.jpg" \
+      "$stage/assets/img/white-front.jpeg" "$stage/assets/img/white-back.jpeg" \
+      "$stage/assets/img/card/front-demo.png" "$stage/assets/img/card/back-demo.png" \
+      "$stage/assets/img/card/portrait.jpg"
+
+# The pre-printed booklet pages the print copy is registered against. Design
+# references for measuring positions, loaded by nothing, and 1.4MB together.
+rm -f "$stage/assets/img/page-01.jpg" "$stage/assets/img/page-23.jpg"
 
 # ---- archive -----------------------------------------------------------------
 

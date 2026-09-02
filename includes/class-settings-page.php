@@ -101,8 +101,9 @@ final class Settings_Page {
 		$qr        = new QR_Generator( $this->settings );
 		$statuses  = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
 		$documents = array(
-			'booklet' => __( 'Permit booklet — A4, 210 × 297 mm portrait', 'idta-pdf' ),
-			'card'    => __( 'Permit card — 85.6 × 53.98 mm portrait', 'idta-pdf' ),
+			'booklet'    => __( 'Permit booklet — A4, 210 × 297 mm portrait', 'idta-pdf' ),
+			'card'       => __( 'Permit card — 85.6 × 53.98 mm portrait', 'idta-pdf' ),
+			'print-copy' => __( 'Permit print — A5, the holder\'s details alone, for printing onto pre-printed booklet stock', 'idta-pdf' ),
 		);
 		$emails    = array(
 			'customer_processing_order' => __( 'Processing order', 'idta-pdf' ),

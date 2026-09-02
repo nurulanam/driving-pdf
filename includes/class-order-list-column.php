@@ -142,8 +142,9 @@ final class Order_List_Column {
 		$documents = $this->generator->generated_documents( $order );
 
 		$labels = array(
-			'booklet' => __( 'Permit', 'idta-pdf' ),
-			'card'    => __( 'Card', 'idta-pdf' ),
+			'booklet'    => __( 'Permit', 'idta-pdf' ),
+			'card'       => __( 'Card', 'idta-pdf' ),
+			'print-copy' => __( 'Permit print', 'idta-pdf' ),
 		);
 
 		// One row, wrapping only if the column is too narrow for it.

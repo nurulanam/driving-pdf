@@ -61,14 +61,30 @@ final class Artwork {
 	);
 
 	/**
-	 * Bundled card faces, keyed by artwork key.
+	 * Bundled card artwork, keyed by artwork key.
+	 *
+	 * Both faces are drawn from these parts rather than printed over a single
+	 * pre-composed background, so the type is live text and the layout can be
+	 * corrected without re-exporting an image.
+	 *
+	 * An icon key left empty prints that row's label and code without artwork
+	 * rather than a broken image.
 	 *
 	 * @var array<string,string>
 	 */
 	private const CARD = array(
-		'front' => 'assets/img/white-front.jpg',
-		'back'  => 'assets/img/white-back.jpg',
-		'stamp' => 'assets/img/blank-stamp.png',
+		// Front: the white seal in the header, the blue seal over the portrait,
+		// and the guilloche panel behind the fields.
+		'head_logo' => 'assets/img/card/IAA-logo-white.png',
+		'stamp'     => 'assets/img/card/stamp.png',
+		'front_bg'  => 'assets/img/card/font-bottom-bg.png',
+		// Back: the horizontal lockup, then one icon per vehicle category.
+		'back_logo' => 'assets/img/card/iaa-back-logo.png',
+		'icon_a'    => 'assets/img/card/Motorcycles.png',
+		'icon_b'    => 'assets/img/card/Passenger-cars.png',
+		'icon_c'    => 'assets/img/card/Goods vehicles.png',
+		'icon_d'    => 'assets/img/card/Buses-Autobus.png',
+		'icon_e'    => 'assets/img/card/Car-with-trailer.png',
 	);
 
 	/**

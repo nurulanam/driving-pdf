@@ -152,8 +152,39 @@ final class Plugin {
 		}
 
 		Public_Pages::ensure_pages();
+		$this->adopt_new_documents();
 
 		update_option( self::VERSION_OPTION, VERSION );
+	}
+
+	/**
+	 * Switch on a document added since the settings were last saved.
+	 *
+	 * Changing the default in Settings::defaults() only reaches a site that has
+	 * never saved the option. Any site that has visited the settings screen
+	 * carries the old list, and would silently go on producing the old set — so
+	 * a document added to Settings::DOCUMENTS is enabled once, here, on the
+	 * upgrade that introduces it. Untick it afterwards and it stays off: this
+	 * runs once per plugin version, not once per request.
+	 */
+	private function adopt_new_documents(): void {
+		$stored = get_option( Settings::OPTION_KEY );
+
+		if ( ! is_array( $stored ) || ! isset( $stored['documents'] ) || ! is_array( $stored['documents'] ) ) {
+			return;
+		}
+
+		$missing = array_diff( Settings::DOCUMENTS, $stored['documents'] );
+
+		if ( array() === $missing ) {
+			return;
+		}
+
+		$stored['documents'] = array_values(
+			array_intersect( Settings::DOCUMENTS, array_merge( $stored['documents'], $missing ) )
+		);
+
+		update_option( Settings::OPTION_KEY, $stored );
 	}
 
 	/**

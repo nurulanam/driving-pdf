@@ -1,200 +1,574 @@
 /**
- * Card layout: 85.6 x 53.98 mm.
+ * Card layout: 85.6 x 53.98 mm, front and back.
+ *
+ * Rebuilt from the reference faces in `assets/img/card` — front-demo.png and
+ * back-demo.png, both 1597 x 1009 px for an 85.6 x 53.98 mm card, so 18.66 px =
+ * 1 mm. Every size below was measured off those files: the point sizes were
+ * solved from each string's printed width against the DejaVu metrics, and the
+ * boxes from the reference differenced against its own background artwork.
+ *
+ * Three mPDF constraints shape the structure, each verified by rendering:
+ *
+ *   - `position: absolute` is ignored, so the faces are a stack of fixed-height
+ *     bands and anything that overlaps reaches back with a negative margin.
+ *   - A table nested inside a `<td>` is ignored, so the columns within a band
+ *     are floats, not cells.
+ *   - `background-size` is ignored; `background-image-resize: 6` is what
+ *     actually stretches a background to its box.
  *
  * Loaded after the base stylesheet, so the point sizes here intentionally
  * override the 10pt default — a credit-card face cannot carry 10pt body copy.
  * Operator CSS is loaded after this file and overrides it in turn.
- *
- * Every measurement below was taken from `assets/img/front-full.jpg`, the printed
- * design, by differencing it against the blank `white-front.jpg` artwork and
- * measuring the pixels that differ. The artwork is 1597 x 1009 px for an
- * 85.6 x 53.98 mm card, so 18.66 px = 1 mm.
  */
 
 .idta-card {
 	width: 85.6mm;
 	height: 53.98mm;
-	position: relative;
 	overflow: hidden;
-	background-color: #ffffff;
-	background-repeat: no-repeat;
-	background-position: center center;
-	/**
-	 * mPDF ignores `background-size`, drawing the artwork at its natural pixel
-	 * size and cropping it to the top-left; its own `background-image-resize` is
-	 * what actually scales a background.
-	 *
-	 * 6, not 5. 5 fits the height and keeps the aspect ratio, and the artwork is
-	 * a whisker wider in proportion than the card — so it came out 0.16mm narrow
-	 * and, centred, left a hairline of bare card down each edge. 6 scales width
-	 * and height independently to fill the face exactly.
-	 */
-	background-image-resize: 6;
-	font-family: robotocondensed;
-	color: #071f3d;
+	font-family: lato;
+	color: #111111;
 }
 
 .idta-card--back {
 	page-break-before: always;
 }
 
+/* ============================ FRONT ==================================== */
+
 /**
- * Clears the header the artwork already carries — logo, the title in six
- * languages, the seal and the guilloche divider. The first field label prints
- * 27.1mm down the card; this padding plus the leading above the first line puts
- * it there.
+ * The header's gradient runs left to right, reaching its lighter blue at 54% and
+ * holding it to the right edge — measured across the reference, which is a flat
+ * #00399D from 56mm on.
  */
-.idta-card--front {
-	padding-top: 27.34mm;
-}
-
-/* ---- Portrait and signature, 4.8mm from the left edge ---- */
-
-.idta-card__photo {
-	float: left;
-	width: 18.2mm;
-}
-
-/* An image's top sits on the block's top edge; text drops by its own leading, so
-   the portrait needs its own offset to line up with the first field label. */
-.idta-card__portrait {
-	width: 13.45mm;
-	margin: 1.08mm 0 0 4.77mm;
+.cf-head {
+	width: 85.6mm;
+	height: 20.54mm;
+	background-color: #00399D;
+	background-image: linear-gradient(to right, #00316E 0%, #00399D 54%);
 }
 
 /**
- * Class on the image itself: mPDF ignores a descendant `img` selector.
+ * Pulled back up beside the titles. The negative margin is the height of the
+ * title stack it has to reach over, less the 2.89mm the seal sits down from the
+ * band's top edge — so it tracks .cf-t1's padding-top.
+ */
+.cf-head__sealbox {
+	margin-top: -16.5mm;
+	padding-left: 4.66mm;
+	line-height: 0;
+	font-size: 0;
+}
+
+.cf-head__seal {
+	width: 15.2mm;
+	vertical-align: top;
+}
+
+/**
+ * The eight-language title block. Each line is its own block because they are
+ * set at five different sizes; a single block with <br> could not vary them.
  *
- * Only the width is set. mPDF ignores `height` on an image, and a signature is
- * the one thing here that must not be cropped to make it obey, so its height
- * follows from its own proportions.
+ * Divs, not paragraphs. The base stylesheet gives every <p> a bottom margin and
+ * mPDF applies it over a class rule that says otherwise — six of those added
+ * 8.5mm, overflowed this band's fixed height and pushed the whole lower half of
+ * the card onto a second page.
  */
-.idta-card__signature {
-	width: 9.38mm;
-	margin: 1.01mm 0 0 6.86mm;
+/* Left-aligned, as the reference sets it: every line starts at the same 21.9mm. */
+.cf-head__titles {
+	margin-left: 21.4mm;
+	width: 62mm;
+	text-align: left;
+	color: #ffffff;
 }
 
-/* ---- Duplicate portrait and QR, against the right edge ---- */
-
-.idta-card__aside {
-	float: right;
-	width: 15.4mm;
+.cf-head__titles div {
+	margin: 0;
+	font-weight: bold;
+	line-height: 1.15;
 }
-
-.idta-card__ghost {
-	width: 7.13mm;
-	margin: 0.1mm 0 0 1mm;
-	opacity: 0.9;
-}
-
-.idta-card__qr {
-	width: 9.2mm;
-	height: 9.2mm;
-	margin-top: 0.97mm;
-}
-
-/* ---- The eight numbered fields ---- */
 
 /**
- * Two columns of four. The left column's labels start 20.2mm from the card edge
- * and the right column's at 46.9mm, which is where these widths come from once
- * the portrait float (18.2mm) and this block's own left margin are accounted for.
+ * Sizes solved from each line's printed width in the reference against Lato's
+ * metrics — which is also what identified the face: the back title's width and
+ * its cap height agree on 7.95pt in Lato and disagree in anything else.
+ *
+ * The padding is the air above the whole stack. Changing it moves the seal too,
+ * which is pulled back up past this block — keep .cf-head__sealbox in step.
  */
-.idta-card__details {
-	float: left;
-	width: 49.9mm;
-	margin-left: 2.05mm;
+.cf-t1 {
+	font-size: 10pt;
+	padding-top: 2.1mm;
 }
 
-.idta-card__fields {
-	width: 49.9mm;
+.cf-t2 {
+	font-size: 5.45pt;
+}
+
+.cf-t3 {
+	font-size: 7.55pt;
+}
+
+.cf-t4 {
+	font-size: 6.65pt;
+}
+
+.cf-t5 {
+	font-size: 6.15pt;
+}
+
+/**
+ * Hebrew then Arabic, the one line not set in Lato — it has neither script.
+ * dejavusans covers both, shapes and joins the Arabic, and sets each run
+ * right-to-left.
+ */
+.cf-t6 {
+	font-family: dejavusans;
+	font-size: 6.5pt;
+}
+
+/**
+ * The black rule between the header and the fields, its text centred in the
+ * black by equal padding above and below rather than a declared height. mPDF
+ * cannot centre a block's text vertically, and it adds padding to a height, so
+ * the line box plus symmetric padding is what sets the band's 4.28mm.
+ *
+ * mPDF gives 6.65pt at 1.35 a 3.09mm line box — taller than the metrics predict
+ * — so the padding is 0.6mm each side to hold the band to 4.28mm. Measured off a
+ * render; at 0.78mm the band came to 4.65mm and the extra 0.4mm was enough to
+ * push the body onto a page of its own.
+ */
+.cf-band {
+	width: 85.6mm;
+	background-color: #000000;
+	color: #ffffff;
+	font-size: 6.65pt;
+	font-weight: bold;
+	line-height: 1.35;
+	text-align: center;
+	padding: 0.6mm 0;
+}
+
+/**
+ * The guilloche panel. `background-image-resize: 6` scales the artwork to the
+ * box in both directions — mPDF otherwise draws it at its natural pixel size and
+ * crops to the top-left.
+ *
+ * The white ground matters: the artwork carries its own alpha channel (110-255),
+ * so whatever sits under it shows through. Over a tinted ground the panel prints
+ * muddy rather than the pale cream the reference has.
+ */
+/* 29mm, not 29.15: the three bands would then total exactly the 53.98mm page and
+   mPDF breaks at exactly the page height. The 0.17mm this leaves is covered by
+   the face's own background — see .idta-card--front. */
+.cf-body {
+	width: 85.6mm;
+	height: 29mm;
+	background-color: #ffffff;
+	background-repeat: no-repeat;
+	background-position: top left;
+	background-image-resize: 6;
+}
+
+/* ---- Portrait, signature and the stamp across it ---- */
+
+/**
+ * The portrait column, narrowed from 25mm so the fields sit nearer the
+ * portrait. It has to stay wide enough for the signature and stamp side by side
+ * beneath it: mPDF wraps an image that will not fit its column rather than
+ * letting it overhang, which dropped the stamp off the face entirely.
+ *
+ * Everything in this column has to total 29.16mm or less *before* any negative
+ * margin is applied, because mPDF picks a page break from a block's pre-margin
+ * position. That budget is what caps the portrait's size.
+ */
+.cf-photo {
+	float: left;
+	width: 23mm;
+}
+
+/**
+ * Square, so it prints the passport photo whole rather than centre-cropped.
+ *
+ * 21.3mm is the ceiling. The stamp below it is 7.5mm tall and mPDF judges a page
+ * break from where a block sits *before* its negative margin, so the portrait's
+ * height plus the stamp's has to clear the foot of the card on its own:
+ * 24.82 + 21.3 + 7.5 = 53.6mm of 53.98mm. Past that the stamp printed on a page
+ * of its own.
+ */
+.cf-photo__img {
+	width: 21.3mm;
+	vertical-align: top;
+}
+
+/**
+ * The signature and stamp sit side by side below the portrait.
+ *
+ * They share a row so it stands only as tall as the taller of the two, where
+ * stacking them would add both heights to this column's budget.
+ *
+ * The row is not pulled up — the stamp alone is. Pulling the row took the
+ * signature with it, back over the portrait it is meant to clear, and it cost
+ * the portrait its size too: a negative margin on the row does not reduce what
+ * the column claims, so every millimetre the stamp rose came off the portrait.
+ */
+.cf-photo__row {
+	margin-top: 0;
+}
+
+/* Clear of the portrait's lower edge, and in from the card's left edge. */
+.cf-photo__sign {
+	float: left;
+	width: 12.5mm;
+	padding-top: 0.6mm;
+	padding-left: 1.6mm;
+	line-height: 0;
+	font-size: 0;
+}
+
+.cf-photo__sign img {
+	width: 12.5mm;
+	vertical-align: top;
+}
+
+/**
+ * Pulled up on its own, so it stamps across the portrait's lower corner while
+ * the signature stays clear beneath it. A negative margin on a float reduces
+ * what that float contributes to the row, so this buys the portrait height back
+ * rather than spending it.
+ */
+.cf-photo__stamp {
+	float: left;
+	width: 7.5mm;
+	margin-top: -3.5mm;
+	line-height: 0;
+	font-size: 0;
+}
+
+.cf-photo__stamp img {
+	width: 7.5mm;
+	vertical-align: top;
+}
+
+.cf-side__row {
+	line-height: 0;
+	font-size: 0;
+}
+
+/* ---- The numbered fields, in two columns ---- */
+
+/**
+ * The three body columns must total under 85.6mm including padding, or mPDF
+ * drops the last one onto its own line — which put the duplicate portrait and
+ * the QR under the fields instead of beside them. 25 + 43.5 + 16.2 = 84.7mm.
+ */
+/**
+ * The body's floats need more slack than the 85.6mm face suggests: measured by
+ * rendering, the side column drops onto its own line once the three columns and
+ * their padding pass about 83.5mm. 23 + 43.9 + 16.2 = 83.1mm.
+ */
+.cf-fields {
+	float: left;
+	width: 42.4mm;
+	padding-top: 1.3mm;
+	padding-left: 1.5mm;
+}
+
+/**
+ * One table, four columns. The height is on every cell: with it on one, mPDF
+ * centres the others in the taller row.
+ */
+.cf-grid {
+	width: 42.4mm;
 	border-collapse: collapse;
 }
 
 /**
- * The label row is 2.1mm tall and the value row 3.7mm, giving the artwork's
- * 5.8mm pitch from one field to the next.
+ * Weight 800, which mPDF reaches as a family of its own.
  *
- * Labels print at 4.2pt: Roboto Condensed is close to the artwork's own face, so
- * unlike the wider fonts mPDF ships this needed almost no reduction to fit the
- * longest bilingual label in its column.
+ * font-weight stays normal on purpose: the family's regular slot already holds
+ * the extra-bold face, and asking for bold on top would have mPDF stroke the
+ * outline and thicken it again.
+ *
+ * font-family is restated because a `<td>` does not inherit it in mPDF — these
+ * fell back to the base serif while everything around them set in Lato.
  */
-/* font-family and color are restated on the cells: mPDF inherits neither into a
-   `td`. Without font-family the fields fall back to the body's wider face and
-   the bilingual labels run into the next column; without color they fall back
-   to mPDF's default black rather than the card's navy. */
-.idta-card__label {
-	height: 1.98mm;
-	font-family: robotocondensed;
-	color: #071f3d;
-	font-size: 4.2pt;
-	line-height: 1;
+.cf-n,
+.cf-v {
+	font-family: latoextrabold;
+	height: 4.23mm;
 	vertical-align: top;
+	font-size: 6.8pt;
+	font-weight: normal;
 	padding: 0;
 	white-space: nowrap;
 }
 
-.idta-card__value {
-	height: 3.81mm;
-	font-family: robotocondensed;
-	color: #071f3d;
-	font-weight: bold;
-	line-height: 1.08;
-	vertical-align: top;
-	padding: 0 0 0 1.14mm;
+.cf-n {
+	width: 3.2mm;
+	text-align: right;
+	padding-right: 1.1mm;
 }
 
-/* The authority is the one field set over two lines, and the only one left in
-   mixed case. Card_Document upper-cases the rest. */
-.idta-card__value--wrap {
-	height: auto;
-	white-space: normal;
+.cf-v--a {
+	width: 21.2mm;
+}
+
+.cf-v--b {
+	width: 14.8mm;
+}
+
+/* "CLASS." is set lighter and smaller than the letter it labels. */
+.cf-class {
+	height: 3.91mm;
+}
+
+.cf-class__label {
+	font-size: 6.2pt;
+}
+
+/* The letters match the numbered values; only the word "CLASS." is left lighter. */
+.cf-class__value {
+	font-family: latoextrabold;
+	font-size: 8.8pt;
+	font-weight: normal;
+	padding-left: 0.8mm;
+}
+
+/* ---- Duplicate portrait and the QR, right-aligned ---- */
+
+/**
+ * The three body floats plus their padding must total under 85.6mm: at 86.3mm
+ * mPDF dropped this column onto its own line, off the bottom of the face.
+ * 25 + 43.5 + 16.2 = 84.7mm.
+ */
+.cf-side {
+	float: left;
+	width: 13.2mm;
+	text-align: right;
+	padding: 4.8mm 3mm 0 0;
 }
 
 /**
- * Column widths, not padding. The left column is 26.6mm wide because the right
- * column's labels start 46.9mm from the card edge and the left column's at
- * 20.2mm; a padding-based offset instead let mPDF's auto table layout shrink the
- * left column to its content and the two columns of labels ran together.
+ * 10.8mm, so it finishes the same width as the QR below it: that carries a
+ * 0.5mm white surround on each side, which counts toward its printed width.
  */
-.idta-card__cell--left {
-	width: 26.64mm;
+.cf-side__photo {
+	width: 10.8mm;
+	vertical-align: top;
 }
 
-.idta-card__cell--right {
-	width: 23.26mm;
-	padding-left: 0;
+/**
+ * A white surround, so the code reads clear of the guilloche behind it.
+ *
+ * The background is not redundant with the border: the artwork carries a 6px
+ * transparent margin of its own, and without a white ground the guilloche
+ * printed through it as a thin patterned line just inside the white.
+ */
+.cf-side__qr {
+	width: 9.8mm;
+	vertical-align: top;
+	background-color: #ffffff;
+	border: 0.5mm solid #ffffff;
 }
 
-.idta-card__value.idta-card__cell--right {
-	padding-left: 1.34mm;
+/* ============================= BACK ==================================== */
+
+/**
+ * The height is restated because mPDF adds padding to a declared one: at the
+ * 53.98mm .idta-card sets, plus this padding, the face measured 57.3mm and the
+ * last legend line spilled onto a third page. 50.98 + 3 = 53.98mm, which also
+ * carries the grey to the foot of the card rather than leaving a white hairline.
+ */
+/* Painted so the hairline the bands leave at the foot is the guilloche's own
+   tone rather than bare white; the same trick carries the grey on the back. */
+.idta-card--front {
+	background-color: #FBF3D5;
 }
 
-/* ---- Fallback back face, used only when no artwork is configured ---- */
-
-.idta-card__back-table {
-	width: 60mm;
-	margin: 6mm 0 0 4mm;
+.idta-card--back {
+	height: 50.98mm;
+	background-color: #F2F2F2;
+	padding: 3mm 4.9mm 0 4.9mm;
 }
 
-.idta-card__back-label {
-	color: #071f3d;
-	font-size: 5pt;
+/* Divs throughout this face too; see .cf-head__titles for why. */
+.cb-title {
+	font-size: 7.95pt;
 	font-weight: bold;
-	padding: 0.6mm 2mm 0.6mm 0;
-	vertical-align: top;
-	white-space: nowrap;
+	text-align: center;
+	margin: 0;
 }
 
-.idta-card__back-value {
-	color: #071f3d;
-	font-size: 5pt;
-	padding: 0.6mm 0;
+/* Close under the title, with the air below it instead. Weight 500. */
+.cb-sub {
+	font-family: latomedium;
+	font-size: 4.25pt;
+	text-align: center;
+	margin: 0.4mm 0 1.5mm 0;
+}
+
+/**
+ * The two columns and the legend under them have to fit the 53.98mm face. At
+ * Lato's sizes the notes column runs slightly taller than the table, and 0.4mm
+ * more here was enough to break the last legend line onto a third page.
+ */
+.cb-main {
+	width: 75.8mm;
+	padding-top: 0;
+}
+
+/* ---- The category table ---- */
+
+/**
+ * The rounded outline lives on this wrapper, not on the table inside it: mPDF
+ * ignores border-radius on a `<td>` but draws it on a div.
+ *
+ * Keeping the border here also aligns the header with the rows. A header cell
+ * filled with a background colour spans the full table width, while a bordered
+ * cell sits inside its own border, so the two edges never matched.
+ */
+.cb-table {
+	float: left;
+	width: 47.3mm;
+	border: 0.2mm solid #0B37A0;
+	border-radius: 1mm;
+}
+
+/**
+ * The blue band, pulled out over the wrapper's own border on three sides.
+ *
+ * Without that, mPDF strokes the wrapper's rounded border but fills the band
+ * only to the content edge, and the card's grey shows through the hairline
+ * between the two. Both are the same blue, so the overlap is invisible — and the
+ * radius matches the wrapper's outer corner rather than sitting inside it.
+ */
+.cb-head {
+	margin: -0.2mm -0.2mm 0 -0.2mm;
+	background-color: #0B37A0;
+	border-radius: 1mm 1mm 0 0;
+}
+
+.cb-head__grid {
+	width: 47.3mm;
+	border-collapse: collapse;
+}
+
+.cb-head__label,
+.cb-head__code {
+	font-family: lato;
+	color: #ffffff;
+	font-size: 4.25pt;
+	font-weight: bold;
+	height: 5.7mm;
+	vertical-align: middle;
+	padding: 0.4mm 1.2mm;
+}
+
+/* Centred over the code column, as the letters beneath it are. */
+.cb-head__code {
+	width: 10.4mm;
+	text-align: center;
+}
+
+/**
+ * Only the lines between cells. The outer edge is the wrapper's, so nothing
+ * here draws a left, right, top or final bottom border.
+ */
+.cb-grid {
+	width: 47.3mm;
+	border-collapse: collapse;
+}
+
+.cb-grid__cell {
+	border-bottom: 0.2mm solid #0B37A0;
+	height: 5.45mm;
+	vertical-align: middle;
+	padding: 0;
+}
+
+/* The wrapper's own rounded border closes the last row off. */
+.cb-grid__cell--last {
+	border-bottom: none;
+}
+
+.cb-grid__icon {
+	width: 9.1mm;
+	border-right: 0.2mm solid #0B37A0;
+	text-align: center;
+}
+
+.cb-grid__icon-img {
+	width: 6.2mm;
+	vertical-align: middle;
+}
+
+/* Weight 500, which mPDF reaches as a family of its own. */
+.cb-grid__label {
+	width: 27.8mm;
+	border-right: 0.2mm solid #0B37A0;
+	font-family: latomedium;
+	font-size: 6.4pt;
+	padding-left: 1.4mm;
+}
+
+.cb-grid__code {
+	width: 10.4mm;
+	font-family: lato;
+	font-size: 7.6pt;
+	font-weight: bold;
+	text-align: center;
+}
+
+/* ---- Lockup and notes ---- */
+
+/**
+ * This float plus the table must total under the 75.8mm content width — at
+ * 77.2mm mPDF dropped this column below the table, onto a page of its own.
+ * 47.7 + 25.5 + 2.2 = 75.4mm.
+ */
+.cb-side {
+	float: left;
+	width: 25.5mm;
+	padding-left: 2.2mm;
+}
+
+.cb-side__logo {
+	width: 24.4mm;
+	margin-top: 0.2mm;
 	vertical-align: top;
 }
 
-.idta-card__back-qr {
-	width: 14mm;
-	height: 14mm;
-	margin: 2mm 0 0 4mm;
+.cb-side__heading {
+	font-size: 5.6pt;
+	font-weight: bold;
+	margin: 2.2mm 0 0 0.8mm;
+}
+
+/**
+ * The bullet is written into the markup: mPDF supports neither `:before`
+ * generated content nor a reliable list marker inside a float. The hanging
+ * indent is padding plus a negative text-indent, so wrapped lines clear it.
+ */
+.cb-side__note {
+	font-family: latomedium;
+	font-size: 4.8pt;
+	line-height: 1.3;
+	margin: 1.1mm 0 0 0;
+	padding-left: 1.9mm;
+	text-indent: -1.9mm;
+}
+
+/* ---- The numbered legend ---- */
+
+/* Weight 600, and the two lines sit close together as printed. */
+.cb-legend {
+	font-family: latosemibold;
+	font-size: 5.45pt;
+	text-align: center;
+	margin: 0.3mm 0 0 0;
+}
+
+/* Clear of the table above it; the second line stays tight to this one. */
+.cb-legend--first {
+	margin-top: 1.4mm;
 }

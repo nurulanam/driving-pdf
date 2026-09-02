@@ -27,6 +27,12 @@ final class Settings {
 	public const DEFAULT_FONT_SIZE = 10.0;
 
 	/**
+	 * Every document this plugin can produce, in the order the screens list it.
+	 *
+	 */
+	public const DOCUMENTS = array( 'booklet', 'card', 'print-copy' );
+
+	/**
 	 * Cached option values.
 	 *
 	 * @var array<string,mixed>|null
@@ -46,7 +52,7 @@ final class Settings {
 			'booklet_css'      => '',
 			'card_css'         => '',
 			'trigger_statuses' => array( 'pending', 'processing', 'completed' ),
-			'documents'        => array( 'booklet', 'card' ),
+			'documents'        => array( 'booklet', 'card', 'print-copy' ),
 			/**
 			 * Email attachments are off by default: the booklet embeds every
 			 * scanned page at full resolution and routinely exceeds 10 MB,
@@ -149,7 +155,7 @@ final class Settings {
 		$documents = (array) ( $input['documents'] ?? $defaults['documents'] );
 
 		$clean['documents'] = array_values(
-			array_intersect( array( 'booklet', 'card' ), array_map( 'sanitize_key', $documents ) )
+			array_intersect( self::DOCUMENTS, array_map( 'sanitize_key', $documents ) )
 		);
 
 		$emails = (array) ( $input['attach_to_emails'] ?? array() );
@@ -257,13 +263,13 @@ final class Settings {
 	 * @return string[]
 	 */
 	public function enabled_documents(): array {
-		$documents = (array) $this->get( 'documents', array( 'booklet', 'card' ) );
+		$documents = (array) $this->get( 'documents', self::DOCUMENTS );
 
 		$documents = array_values(
-			array_intersect( array( 'booklet', 'card' ), array_map( 'strval', $documents ) )
+			array_intersect( self::DOCUMENTS, array_map( 'strval', $documents ) )
 		);
 
-		return array() !== $documents ? $documents : array( 'booklet', 'card' );
+		return array() !== $documents ? $documents : self::DOCUMENTS;
 	}
 
 	/**

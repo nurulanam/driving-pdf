@@ -64,10 +64,39 @@ final class Fonts {
 				'useOTL'     => 255,
 				'useKashida' => 75,
 			),
-			// The card face, matching the artwork's own condensed grotesque more
-			// closely than anything else bundled. Apache-2.0; see
-			// licenses/RobotoCondensed-LICENSE.txt. Only the two weights the card
-			// uses are registered.
+			/*
+			 * The card face. SIL Open Font License 1.1; see
+			 * licenses/Lato-LICENSE.txt.
+			 *
+			 * Four families, not one, because mPDF only holds four styles per
+			 * family — regular, bold, italic, bold-italic — and has no notion of
+			 * a numeric weight. The card asks for 500, 600 and 800 in places, so
+			 * those weights are registered as families of their own and named
+			 * directly in the stylesheet.
+			 *
+			 * Latin, Latin Extended and Cyrillic only: Lato has no Hebrew or
+			 * Arabic, so the one line of the front that sets those stays in
+			 * dejavusans.
+			 *
+			 * No useOTL. These files carry no GDEF table and mPDF throws outright
+			 * rather than ignoring the request. None of the scripts Lato covers
+			 * needs the shaping anyway.
+			 */
+			'lato'          => array(
+				'R' => 'Lato-Regular.ttf',
+				'B' => 'Lato-Bold.ttf',
+			),
+			'latomedium'    => array(
+				'R' => 'Lato-Medium.ttf',
+			),
+			'latosemibold'  => array(
+				'R' => 'Lato-SemiBold.ttf',
+			),
+			'latoextrabold' => array(
+				'R' => 'Lato-ExtraBold.ttf',
+			),
+			// Kept for the operator CSS that may still name it. Apache-2.0; see
+			// licenses/RobotoCondensed-LICENSE.txt.
 			'robotocondensed' => array(
 				'R'      => 'RobotoCondensed-Regular.ttf',
 				'B'      => 'RobotoCondensed-Bold.ttf',
