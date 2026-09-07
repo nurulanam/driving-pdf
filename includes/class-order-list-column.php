@@ -145,12 +145,25 @@ final class Order_List_Column {
 			'booklet'    => __( 'Permit', 'idta-pdf' ),
 			'card'       => __( 'Card', 'idta-pdf' ),
 			'print-copy' => __( 'Permit print', 'idta-pdf' ),
+			'card-front-bmp' => __( 'Card front (BMP)', 'idta-pdf' ),
+			'card-back-bmp'  => __( 'Card back (BMP)', 'idta-pdf' ),
+		);
+
+		/*
+		 * The card's bitmap faces are derived from the card PDF rather than
+		 * requested in their own right, so documents_for() does not name them.
+		 * Appending whatever else is on disk lists them for download without
+		 * offering a "Generate" button that no document class could answer.
+		 */
+		$listed = array_merge(
+			$requested,
+			array_values( array_diff( array_keys( $documents ), $requested ) )
 		);
 
 		// One row, wrapping only if the column is too narrow for it.
 		echo '<div class="idta-pdf-column" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">';
 
-		foreach ( $requested as $slug ) {
+		foreach ( $listed as $slug ) {
 			$label = $labels[ $slug ] ?? $slug;
 
 			if ( isset( $documents[ $slug ] ) ) {

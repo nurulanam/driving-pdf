@@ -144,6 +144,21 @@ final class Order_Admin {
 			'booklet'    => __( 'Permit booklet (A4)', 'idta-pdf' ),
 			'card'       => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
 			'print-copy' => __( 'Permit print (A5)', 'idta-pdf' ),
+			// Written alongside the card PDF when card bitmaps are enabled, so
+			// they appear here only once they exist.
+			'card-front-bmp' => __( 'Card front (BMP, 300 dpi)', 'idta-pdf' ),
+			'card-back-bmp'  => __( 'Card back (BMP, 300 dpi)', 'idta-pdf' ),
+		);
+
+		/*
+		 * The card's bitmap faces are derived from the card PDF rather than
+		 * requested in their own right, so documents_for() does not name them.
+		 * Appending whatever else is on disk lists them for download without
+		 * offering a "Generate" button that no document class could answer.
+		 */
+		$listed = array_merge(
+			$requested,
+			array_values( array_diff( array_keys( $documents ), $requested ) )
 		);
 
 		echo '<ul style="margin:0 0 12px;">';
@@ -155,7 +170,7 @@ final class Order_Admin {
 			);
 		}
 
-		foreach ( $requested as $slug ) {
+		foreach ( $listed as $slug ) {
 			$label = $labels[ $slug ] ?? $slug;
 
 			if ( isset( $documents[ $slug ] ) ) {

@@ -71,6 +71,12 @@ final class Settings {
 			// keep working without a trip to this screen first.
 			'asset_sources'    => Order_Data::SOURCES,
 			'grayscale_ghost'  => true,
+			/**
+			 * Bitmap card faces, off by default. They are only wanted where the
+			 * card is printed on a direct-to-card printer, they need a PDF
+			 * rasteriser on the server, and each face is about 1.9 MB.
+			 */
+			'card_bmp'         => false,
 			'debug_html'       => false,
 		);
 	}
@@ -171,6 +177,7 @@ final class Settings {
 		$clean['asset_sources'] = $this->sanitize_sources( (array) ( $input['asset_sources'] ?? array() ) );
 
 		$clean['grayscale_ghost'] = ! empty( $input['grayscale_ghost'] );
+		$clean['card_bmp']        = ! empty( $input['card_bmp'] );
 		$clean['debug_html']      = ! empty( $input['debug_html'] );
 
 		return $clean;
@@ -356,6 +363,15 @@ final class Settings {
 	 */
 	public function grayscale_ghost(): bool {
 		return (bool) $this->get( 'grayscale_ghost', true );
+	}
+
+	/**
+	 * Whether to write the card's two faces as bitmaps alongside the card PDF.
+	 *
+	 * @return bool
+	 */
+	public function card_bitmaps(): bool {
+		return (bool) $this->get( 'card_bmp', false );
 	}
 
 	/**

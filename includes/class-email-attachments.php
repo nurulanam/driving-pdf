@@ -85,6 +85,17 @@ final class Email_Attachments {
 		}
 
 		foreach ( $documents as $path ) {
+			/*
+			 * PDFs only. The stored map also holds the card's bitmap faces,
+			 * which are production files for whoever runs the card printer, and
+			 * attaching them would put nearly 4 MB of images the customer
+			 * cannot use onto an email that is already large enough to be
+			 * refused.
+			 */
+			if ( 'pdf' !== strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) ) {
+				continue;
+			}
+
 			if ( is_readable( $path ) ) {
 				$attachments[] = $path;
 			}

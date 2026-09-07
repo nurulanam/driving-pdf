@@ -179,7 +179,7 @@ final class Download_Handler {
 	}
 
 	/**
-	 * Stream a stored PDF and exit.
+	 * Stream a stored document and exit.
 	 *
 	 * @param string $path     Absolute path.
 	 * @param string $filename Download filename.
@@ -193,7 +193,20 @@ final class Download_Handler {
 
 		nocache_headers();
 
-		header( 'Content-Type: application/pdf' );
+		/*
+		 * Typed from the extension, not assumed: the card's bitmap faces are
+		 * served through this same handler, and a BMP labelled as a PDF is
+		 * offered to the browser as a PDF and refused by the card printer's
+		 * software.
+		 */
+		$types = array(
+			'pdf' => 'application/pdf',
+			'bmp' => 'image/bmp',
+		);
+
+		$extension = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+
+		header( 'Content-Type: ' . ( $types[ $extension ] ?? 'application/octet-stream' ) );
 		header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $filename ) . '"' );
 		header( 'X-Content-Type-Options: nosniff' );
 
@@ -248,9 +261,20 @@ final class Download_Handler {
 		foreach ( $this->generator->generated_documents( $order ) as $slug => $path ) {
 			unset( $path );
 
+			/*
+			 * Only the documents named above are offered to the customer. The
+			 * stored map also holds production files — the card's bitmap faces,
+			 * which exist for whoever operates the card printer — and those are
+			 * of no use to the holder: two 1.9 MB images of a card they are
+			 * already being sent. They stay on the admin screens.
+			 */
+			if ( ! isset( $labels[ $slug ] ) ) {
+				continue;
+			}
+
 			$actions[ 'idta_pdf_' . $slug ] = array(
 				'url'  => $this->url( $order, $slug ),
-				'name' => $labels[ $slug ] ?? __( 'Download document', 'idta-pdf' ),
+				'name' => $labels[ $slug ],
 			);
 		}
 

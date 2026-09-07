@@ -181,6 +181,42 @@ final class Settings_Page {
 						</tr>
 
 						<tr>
+							<th scope="row"><?php esc_html_e( 'Card bitmaps', 'idta-pdf' ); ?></th>
+							<td>
+								<?php
+								$bitmaps_ready = Card_Bitmap::is_available();
+								list( $bitmap_w, $bitmap_h ) = Card_Bitmap::pixels();
+								?>
+								<label style="display:block;margin-bottom:4px;">
+									<input
+										type="checkbox"
+										name="idta_pdf[card_bmp]"
+										value="1"
+										<?php checked( (bool) $values['card_bmp'] ); ?>
+										<?php disabled( ! $bitmaps_ready ); ?>
+									>
+									<?php
+									printf(
+										/* translators: 1: pixel width, 2: pixel height, 3: resolution in dots per inch. */
+										esc_html__( 'Also write each card face as a 24-bit RGB bitmap, %1$d × %2$d px at %3$d dpi', 'idta-pdf' ),
+										(int) $bitmap_w,
+										(int) $bitmap_h,
+										(int) Card_Bitmap::DPI
+									);
+									?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( 'For a direct-to-card printer such as a Zebra ZC300. One pixel per printer dot, so the driver resamples nothing and fine type and the guilloche pattern stay sharp. The two faces are listed with the order\'s documents as "Card front" and "Card back".', 'idta-pdf' ); ?>
+								</p>
+								<?php if ( ! $bitmaps_ready ) : ?>
+									<p class="description" style="color:#b32d2e;">
+										<?php esc_html_e( 'Unavailable on this server: converting the card PDF to a bitmap needs the Imagick extension, Ghostscript or pdftoppm, and none of them can be reached. Ask your host to enable one.', 'idta-pdf' ); ?>
+									</p>
+								<?php endif; ?>
+							</td>
+						</tr>
+
+						<tr>
 							<th scope="row"><?php esc_html_e( 'Generate at', 'idta-pdf' ); ?></th>
 							<td>
 								<?php foreach ( $statuses as $key => $label ) : ?>

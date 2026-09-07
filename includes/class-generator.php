@@ -222,6 +222,8 @@ final class Generator {
 			}
 		}
 
+		$results = $this->with_card_bitmaps( $order, $results );
+
 		$this->store_documents( $order, $results );
 
 		if ( array() === $results ) {
@@ -297,6 +299,8 @@ final class Generator {
 		$path = $this->render_to_disk( $order, $documents[ $slug ] );
 
 		$existing[ $slug ] = $path;
+
+		$existing = $this->with_card_bitmaps( $order, $existing );
 
 		$this->store_documents( $order, $existing );
 
@@ -450,6 +454,44 @@ final class Generator {
 
 		$order->delete_meta_data( self::DOCUMENTS_META );
 		$order->save_meta_data();
+	}
+
+	/**
+	 * Add the card's bitmap faces to a result map, when they are wanted.
+	 *
+	 * The bitmaps are renders of the card PDF rather than a second layout, so
+	 * they cannot drift from it, and mPDF's text shaping — which the front's
+	 * Arabic and Hebrew line depends on — is already baked into the page by the
+	 * time it is rasterised.
+	 *
+	 * A failure here is not a failure of the order: the card PDF is already
+	 * rendered and is what most sites print. The faces are simply left out and
+	 * the reason logged.
+	 *
+	 * @param \WC_Order            $order   Order object.
+	 * @param array<string,string> $results Paths keyed by document slug.
+	 *
+	 * @return array<string,string>
+	 */
+	private function with_card_bitmaps( \WC_Order $order, array $results ): array {
+		if ( ! isset( $results['card'] ) || ! $this->settings->card_bitmaps() ) {
+			return $results;
+		}
+
+		$faces = ( new Card_Bitmap( $this->filesystem ) )->render( $order, $results['card'] );
+
+		if ( array() === $faces ) {
+			$this->log(
+				sprintf(
+					'Order %d: card bitmaps were requested but no PDF rasteriser (Imagick, Ghostscript or pdftoppm) could be used.',
+					$order->get_id()
+				)
+			);
+
+			return $results;
+		}
+
+		return array_merge( $results, $faces );
 	}
 
 	/**

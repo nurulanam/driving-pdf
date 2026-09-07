@@ -26,7 +26,15 @@
 	height: 53.98mm;
 	overflow: hidden;
 	font-family: lato;
-	color: #111111;
+	/*
+	 * Pure black, not the near-black this used to carry. A direct-to-card
+	 * printer prints black from a separate resin panel and decides what goes
+	 * there by looking for pure black; #111111 misses that test, so every line
+	 * of type was printed as a mix of the three colour panels instead — which
+	 * is dye, laid down softly, and is why the text looked faded on the card
+	 * while being perfectly crisp on screen.
+	 */
+	color: #000000;
 }
 
 .idta-card--back {
