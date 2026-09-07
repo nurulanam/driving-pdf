@@ -198,7 +198,7 @@ final class Settings_Page {
 									<?php
 									printf(
 										/* translators: 1: pixel width, 2: pixel height, 3: resolution in dots per inch. */
-										esc_html__( 'Also write each card face as a 24-bit RGB bitmap, %1$d × %2$d px at %3$d dpi', 'idta-pdf' ),
+										esc_html__( 'Also write the card front as a 24-bit RGB bitmap, %1$d × %2$d px at %3$d dpi', 'idta-pdf' ),
 										(int) $bitmap_w,
 										(int) $bitmap_h,
 										(int) Card_Bitmap::DPI
@@ -206,7 +206,7 @@ final class Settings_Page {
 									?>
 								</label>
 								<p class="description">
-									<?php esc_html_e( 'For a direct-to-card printer such as a Zebra ZC300. One pixel per printer dot, so the driver resamples nothing and fine type and the guilloche pattern stay sharp. The two faces are listed with the order\'s documents as "Card front" and "Card back".', 'idta-pdf' ); ?>
+									<?php esc_html_e( 'For a direct-to-card printer such as a Zebra ZC300. One pixel per printer dot, so the driver resamples nothing and fine type and the guilloche pattern stay sharp. It is listed with the order\'s documents as "Card front". The back is the same on every card, so it is not generated per order.', 'idta-pdf' ); ?>
 								</p>
 								<?php if ( ! $bitmaps_ready ) : ?>
 									<p class="description" style="color:#b32d2e;">

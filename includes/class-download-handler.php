@@ -253,22 +253,16 @@ final class Download_Handler {
 		}
 
 		$labels = array(
-			'booklet'    => __( 'Download permit', 'idta-pdf' ),
-			'card'       => __( 'Download card', 'idta-pdf' ),
-			'print-copy' => __( 'Download permit print', 'idta-pdf' ),
+			'booklet' => __( 'Download permit', 'idta-pdf' ),
+			'card'    => __( 'Download card', 'idta-pdf' ),
 		);
 
 		foreach ( $this->generator->generated_documents( $order ) as $slug => $path ) {
 			unset( $path );
 
-			/*
-			 * Only the documents named above are offered to the customer. The
-			 * stored map also holds production files — the card's bitmap faces,
-			 * which exist for whoever operates the card printer — and those are
-			 * of no use to the holder: two 1.9 MB images of a card they are
-			 * already being sent. They stay on the admin screens.
-			 */
-			if ( ! isset( $labels[ $slug ] ) ) {
+			// The booklet and the card, and nothing else on disk: see
+			// Generator::CUSTOMER_DOCUMENTS.
+			if ( ! in_array( $slug, Generator::CUSTOMER_DOCUMENTS, true ) || ! isset( $labels[ $slug ] ) ) {
 				continue;
 			}
 

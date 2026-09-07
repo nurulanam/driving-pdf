@@ -84,15 +84,14 @@ final class Email_Attachments {
 			}
 		}
 
-		foreach ( $documents as $path ) {
+		foreach ( $documents as $slug => $path ) {
 			/*
-			 * PDFs only. The stored map also holds the card's bitmap faces,
-			 * which are production files for whoever runs the card printer, and
-			 * attaching them would put nearly 4 MB of images the customer
-			 * cannot use onto an email that is already large enough to be
-			 * refused.
+			 * The booklet and the card only — see Generator::CUSTOMER_DOCUMENTS.
+			 * The rest of the folder is production material: the A5 permit
+			 * print, and the card's 1.9 MB bitmap face, which would be attached
+			 * to an email that is already large enough to be refused.
 			 */
-			if ( 'pdf' !== strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) ) {
+			if ( ! in_array( (string) $slug, Generator::CUSTOMER_DOCUMENTS, true ) ) {
 				continue;
 			}
 

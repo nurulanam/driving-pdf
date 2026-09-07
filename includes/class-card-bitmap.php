@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * at 1011 x 638 removes both steps, so a stem drawn one dot wide prints one dot
  * wide.
  *
- * The faces are written separately because that is how such a printer is fed:
+ * A face is written as its own file because that is how such a printer is fed:
  * one image per side, no page furniture.
  *
  * Rasterising a PDF needs a tool the plugin does not bundle, so this is offered
@@ -46,13 +46,18 @@ final class Card_Bitmap {
 	private const HEIGHT_MM = 53.98;
 
 	/**
-	 * Faces, in page order, keyed by the slug each is stored under.
+	 * Faces to write, keyed by the slug each is stored under, valued by the page
+	 * of the card PDF each comes from.
+	 *
+	 * Front only. The back is a fixed design — the category legend and the
+	 * notes — so it is the same on every card and does not need producing per
+	 * order; the front is the one carrying the holder's details. Adding the
+	 * back again is a single line here, since nothing else names a face.
 	 *
 	 * @var array<string,int>
 	 */
 	private const FACES = array(
 		'card-front-bmp' => 1,
-		'card-back-bmp'  => 2,
 	);
 
 	/**
@@ -167,7 +172,7 @@ final class Card_Bitmap {
 	}
 
 	/**
-	 * Write both faces of a card PDF as bitmaps.
+	 * Write the card's bitmap faces.
 	 *
 	 * @param \WC_Order $order Order the card belongs to.
 	 * @param string    $pdf   Absolute path to the card PDF.
@@ -198,7 +203,28 @@ final class Card_Bitmap {
 			}
 		}
 
+		$this->prune( $dir, array_keys( $written ) );
+
 		return $written;
+	}
+
+	/**
+	 * Delete bitmap faces this version no longer produces.
+	 *
+	 * A site that generated a back face under an earlier version would
+	 * otherwise keep a 1.9 MB file on disk and keep offering it for download
+	 * long after it stopped being rebuilt, slowly going stale against the card
+	 * it was rendered from.
+	 *
+	 * @param string   $dir  Order directory.
+	 * @param string[] $keep Face slugs just written.
+	 */
+	private function prune( string $dir, array $keep ): void {
+		foreach ( (array) glob( trailingslashit( $dir ) . '*-bmp.bmp' ) as $file ) {
+			if ( ! in_array( basename( (string) $file, '.bmp' ), $keep, true ) ) {
+				wp_delete_file( (string) $file );
+			}
+		}
 	}
 
 	/**

@@ -128,7 +128,7 @@ final class Thankyou_Redirect {
 		 * @param string    $arg   Query argument name.
 		 * @param \WC_Order $order Order object.
 		 */
-		$arg = (string) apply_filters( 'idta_pdf_thankyou_order_arg', 'order_id', $order );
+		$arg = (string) apply_filters( 'idta_pdf_thankyou_order_arg', 'order-id', $order );
 
 		/**
 		 * Filters the order reference sent to the thank-you page.
@@ -148,6 +148,54 @@ final class Thankyou_Redirect {
 			$order
 		);
 
-		return add_query_arg( rawurlencode( $arg ), rawurlencode( $reference ), $url );
+		$args = array( $arg => $reference );
+
+		/*
+		 * The conversion details the thank-you page reports to its own
+		 * analytics. Named the way Google Ads and GA4 name them, since that is
+		 * what a thank-you page's tag expects to read.
+		 */
+		$transaction = trim( (string) $order->get_transaction_id() );
+
+		if ( '' !== $transaction ) {
+			// The gateway's receipt id, and only when the gateway gave one: a
+			// bank transfer or a cheque leaves it empty, and an empty
+			// transaction-id in a conversion tag is worse than none, since it
+			// deduplicates against every other order that also sent nothing.
+			$args['transaction-id'] = $transaction;
+		}
+
+		$args['currency'] = $order->get_currency();
+
+		/*
+		 * A plain decimal, so the tag reads a number rather than "1.200,00":
+		 * wc_format_decimal normalises whatever separator the store's locale
+		 * uses down to a dot.
+		 *
+		 * Deliberately without a decimal place count. Passing one would round to
+		 * the *store's* configured precision, and this store sells in more than
+		 * one currency: with the store set to JPY's zero decimals, a $59.90
+		 * order reported a conversion value of 60. Left alone, the order's own
+		 * total passes through at whatever precision it was actually charged at.
+		 */
+		$args['value'] = wc_format_decimal( $order->get_total() );
+
+		/**
+		 * Filters the query arguments added to the thank-you URL.
+		 *
+		 * @param array<string,string> $args  Arguments, before encoding.
+		 * @param \WC_Order            $order Order object.
+		 */
+		$args = (array) apply_filters( 'idta_pdf_thankyou_query_args', $args, $order );
+
+		$encoded = array();
+
+		foreach ( $args as $name => $value ) {
+			// Encoded by hand rather than left to add_query_arg, which encodes
+			// the value but not the argument name.
+			$encoded[ rawurlencode( (string) $name ) ] = rawurlencode( (string) $value );
+		}
+
+		return add_query_arg( $encoded, $url );
 	}
 }

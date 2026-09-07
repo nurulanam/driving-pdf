@@ -145,9 +145,8 @@ final class Order_Admin {
 			'card'       => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
 			'print-copy' => __( 'Permit print (A5)', 'idta-pdf' ),
 			// Written alongside the card PDF when card bitmaps are enabled, so
-			// they appear here only once they exist.
+			// it appears here only once it exists.
 			'card-front-bmp' => __( 'Card front (BMP, 300 dpi)', 'idta-pdf' ),
-			'card-back-bmp'  => __( 'Card back (BMP, 300 dpi)', 'idta-pdf' ),
 		);
 
 		/*

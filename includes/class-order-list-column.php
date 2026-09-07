@@ -146,7 +146,6 @@ final class Order_List_Column {
 			'card'       => __( 'Card', 'idta-pdf' ),
 			'print-copy' => __( 'Permit print', 'idta-pdf' ),
 			'card-front-bmp' => __( 'Card front (BMP)', 'idta-pdf' ),
-			'card-back-bmp'  => __( 'Card back (BMP)', 'idta-pdf' ),
 		);
 
 		/*
