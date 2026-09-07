@@ -86,6 +86,100 @@ while IFS= read -r name; do
 	fi
 done < "$keep_list"
 
+# ---- fonts: subset the faces that only ever set fixed strings ----------------
+
+# Three of the bundled scripts are selected by nothing but the translation-page
+# template, and every string they set is fixed text from
+# includes/data/language-pages.php. Subsetting them to exactly those characters
+# takes 8.9MB down to about 150KB, and renders pixel-for-pixel identically —
+# Arabic joining included, because the layout tables are retained.
+#
+# sun-exta is subset too, which is why it is no longer in Fonts::FALLBACKS: at
+# 21.9MB it was 46% of the plugin, and 50,112 glyphs to print 276 characters. It
+# can no longer stand in for CJK that arrives in order data — see the note on
+# Fonts::FALLBACKS.
+#
+# freeserif is left whole on purpose. It is still a fallback, so it has to cover
+# more than these pages.
+if command -v pyftsubset >/dev/null; then
+	chars="$work/chars"
+	mkdir -p "$chars"
+
+	# One file of characters per font file, taken from the language data.
+	STAGE="$stage" CHARS="$chars" php -r '
+		define( "ABSPATH", __DIR__ );
+
+		$pages = require getenv( "STAGE" ) . "/includes/data/language-pages.php";
+		$text  = array();
+		$buf   = "";
+
+		$walk = function ( $value ) use ( &$walk, &$buf ) {
+			if ( is_array( $value ) ) {
+				foreach ( $value as $item ) {
+					$walk( $item );
+				}
+			} elseif ( is_string( $value ) ) {
+				$buf .= $value;
+			}
+		};
+
+		foreach ( $pages as $page ) {
+			$family = isset( $page["font"] ) ? $page["font"] : "dejavuserif";
+			$buf    = "";
+
+			$walk( $page );
+
+			$text[ $family ] = ( isset( $text[ $family ] ) ? $text[ $family ] : "" ) . $buf;
+		}
+
+		require getenv( "STAGE" ) . "/includes/class-fonts.php";
+
+		foreach ( IDTA\PDF\Fonts::bundled() as $family => $faces ) {
+			if ( ! in_array( $family, array( "unbatang", "xbriyaz", "garuda", "sun-exta" ), true ) ) {
+				continue;
+			}
+
+			foreach ( $faces as $file ) {
+				if ( is_string( $file ) && isset( $text[ $family ] ) ) {
+					file_put_contents( getenv( "CHARS" ) . "/" . $file . ".txt", $text[ $family ] );
+				}
+			}
+		}
+	'
+
+	before=0
+	after=0
+
+	for charfile in "$chars"/*.txt; do
+		[ -f "$charfile" ] || continue
+
+		font="$fonts_dir/$( basename "$charfile" .txt )"
+
+		[ -f "$font" ] || continue
+
+		before=$(( before + $( stat -c%s "$font" ) ))
+
+		# --layout-features keeps the shaping tables, which is what lets the
+		# Arabic still join; without them the subset renders unjoined letters.
+		if pyftsubset "$font" --output-file="$font.sub" --text-file="$charfile" \
+			--layout-features='*' --glyph-names --notdef-outline --no-hinting 2>/dev/null
+		then
+			mv "$font.sub" "$font"
+		else
+			rm -f "$font.sub"
+			echo "Could not subset $( basename "$font" ); left whole." >&2
+		fi
+
+		after=$(( after + $( stat -c%s "$font" ) ))
+	done
+
+	if [ "$before" -gt 0 ]; then
+		echo "Fonts subset: $(( before / 1024 ))KB -> $(( after / 1024 ))KB."
+	fi
+else
+	echo "pyftsubset missing; script fonts left whole (about 31MB more)." >&2
+fi
+
 # ---- other dependencies ------------------------------------------------------
 
 # Only endroid's label feature loads these, and no label is ever drawn.
@@ -150,16 +244,20 @@ else
 fi
 
 # The pre-composed card faces: both faces are now drawn from the parts in
-# assets/img/card, so nothing references these 3.8MB of artwork. The two card
-# reference renders are design sources, not shipped assets.
-rm -f "$stage/assets/img/white-front.jpg"  "$stage/assets/img/white-back.jpg" \
+# assets/img/card, so nothing references these of artwork. front-full.jpg is the
+# printed design the old card CSS was measured against, and is referenced by
+# nothing now either. The card reference renders are design sources.
+rm -f "$stage/assets/img/front-full.jpg" \
+      "$stage/assets/img/white-front.jpg"  "$stage/assets/img/white-back.jpg" \
       "$stage/assets/img/white-front.jpeg" "$stage/assets/img/white-back.jpeg" \
       "$stage/assets/img/card/front-demo.png" "$stage/assets/img/card/back-demo.png" \
       "$stage/assets/img/card/portrait.jpg"
 
 # The pre-printed booklet pages the print copy is registered against. Design
 # references for measuring positions, loaded by nothing, and 1.4MB together.
-rm -f "$stage/assets/img/page-01.jpg" "$stage/assets/img/page-23.jpg"
+# assets/img/demos holds the design references the layouts were measured
+# against — the blank stock and photographs of test prints. Nothing loads them.
+rm -rf "$stage/assets/img/demos"
 
 # ---- archive -----------------------------------------------------------------
 

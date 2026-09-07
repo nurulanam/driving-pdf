@@ -32,9 +32,21 @@ final class Fonts {
 	/**
 	 * Faces mPDF may fall back to for a character the requested font lacks.
 	 *
+	 * Between them these cover Latin and its extensions, Cyrillic, Greek,
+	 * Hebrew, Arabic, Devanagari and Ethiopic — every script the plugin sets,
+	 * and every script an order is realistically entered in.
+	 *
+	 * sun-exta used to be third here, as the CJK catch-all. It is not any more:
+	 * the build subsets it to the characters the Chinese and Japanese pages
+	 * actually set, because at 21.9MB it was 46% of the plugin and carried
+	 * 50,112 glyphs to print 276. Those pages still render — they name the face
+	 * directly — but a CJK character arriving in order data no longer has a
+	 * font behind it and will print as an empty box. Put a full CJK face back in
+	 * this list, and in Fonts::bundled(), if that ever needs to work.
+	 *
 	 * @var string[]
 	 */
-	public const FALLBACKS = array( 'dejavusans', 'freeserif', 'sun-exta' );
+	public const FALLBACKS = array( 'dejavusans', 'freeserif' );
 
 	/**
 	 * Bundled faces, in mPDF's fontdata shape, keyed by the name used in CSS.
@@ -103,11 +115,15 @@ final class Fonts {
 				'useOTL' => 255,
 			),
 			// Arabic (page 5).
+			/*
+			 * Regular and bold only. The italics are 2.2MB that nothing can
+			 * reach: this face is selected solely by the translation-page
+			 * template, which sets a weight from the language data and never a
+			 * style.
+			 */
 			'xbriyaz'       => array(
 				'R'          => 'XB Riyaz.ttf',
 				'B'          => 'XB RiyazBd.ttf',
-				'I'          => 'XB RiyazIt.ttf',
-				'BI'         => 'XB RiyazBdIt.ttf',
 				'useOTL'     => 255,
 				'useKashida' => 75,
 			),
@@ -127,20 +143,22 @@ final class Fonts {
 				'useOTL' => 255,
 			),
 			// Devanagari (Hindi, page 16) and Ethiopic (Amharic, page 13).
+			/*
+			 * Regular and bold only. As a fallback this face has to cover
+			 * characters the requested font lacks, but only in the style the
+			 * text is set in, and nothing here is ever italic.
+			 */
 			'freeserif'     => array(
 				'R'          => 'FreeSerif.ttf',
 				'B'          => 'FreeSerifBold.ttf',
-				'I'          => 'FreeSerifItalic.ttf',
-				'BI'         => 'FreeSerifBoldItalic.ttf',
 				'useOTL'     => 255,
 				'useKashida' => 75,
 			),
 			// Thai (page 21).
+			/* Regular and bold only; see xbriyaz for why the obliques go. */
 			'garuda'        => array(
 				'R'      => 'Garuda.ttf',
 				'B'      => 'Garuda-Bold.ttf',
-				'I'      => 'Garuda-Oblique.ttf',
-				'BI'     => 'Garuda-BoldOblique.ttf',
 				'useOTL' => 255,
 			),
 		);

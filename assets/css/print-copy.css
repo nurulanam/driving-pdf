@@ -1,7 +1,7 @@
 /**
  * Print copy: A4, an overlay for pre-printed booklet stock.
  *
- * Registered against the stock itself — assets/img/page-01.jpg and
+ * Registered against the stock itself — assets/img/demos/page-01.jpg and
  * page-23.jpg, read as A5 pages — not derived from booklet.css. That matters:
  * the stock's field rules are 6.81mm apart where the booklet sets its own
  * 10.64mm apart at A4, so anything taken from the booklet walks off the printed
@@ -22,6 +22,23 @@
  * Values sit ON their rules: a block's baseline is its top plus half-leading
  * plus the ascender, so each row's top is solved backwards from the rule the
  * value has to sit on.
+ *
+ * Every offset then carries a registration correction on top of the
+ * measurement, because the printer does not put ink where the geometry says.
+ * Measured off test prints (assets/img/demos/printed-1.jpeg and
+ * printed-23.jpeg) by comparing the overlay against the stock's own rules and
+ * boxes in the same photograph, which cancels the camera's perspective:
+ *
+ *     the sheet prints about 3.5mm LOW and 3.75mm LEFT
+ *
+ * so every position below is 3.5mm higher and 3.75mm further right than the
+ * page geometry alone asks for. It is one offset for the whole sheet, not a
+ * nudge per element, because that is what the evidence showed: the date on page
+ * 2 was 2.7mm low, and the six values on page 4 were 3-5mm low and 3.5-4mm
+ * left, all by the same amount.
+ *
+ * After a re-print, adjust those two figures — nothing else. Each place that
+ * carries them is marked "+offset".
  */
 
 .pc-page {
@@ -49,18 +66,21 @@
  * left, and the rule sits at y 61.16mm. The value is centred over the rule with
  * its baseline just above it.
  *
- * 14.14pt is the booklet's 17pt taken to this page's scale and then enlarged,
- * and the baseline is 1.06mm clear of the rule rather than sitting on it.
+ * 16pt, up from 14.14pt. The dashed rule printed straight through the digits,
+ * which the registration offset explains and the larger size makes worse if it
+ * is not corrected for.
+ *
+ * 49.82mm = 53.32 geometric - 3.5 offset. 57.52 = 53.77 + 3.75 offset.
  */
 .pc-date {
-	padding-top: 55.38mm;
-	padding-left: 53.77mm;
+	padding-top: 49.82mm;
+	padding-left: 57.52mm;
 	margin: 0;
 }
 
 .pc-date__value {
 	width: 54.13mm;
-	font-size: 14.14pt;
+	font-size: 16pt;
 	font-weight: bold;
 	line-height: 1.2;
 	text-align: center;
@@ -72,20 +92,28 @@
  * Six rows, one per printed rule at 19.10, 25.86, 32.69, 39.51, 46.33 and
  * 53.16mm.
  *
- * The block's height is fixed so the row below starts at a known place: the
- * 15.67mm lead-in plus six rows of 6.812mm comes to 56.55mm.
+ * The height is declared, not left to the content, so this block still ends at
+ * 56.55mm and the row beneath it does not move when the lead-in changes. That
+ * matters: the seals in that row are registered to boxes printed on the stock,
+ * so they must stay put while the values above them are nudged.
+ *
+ * 12.17mm = 15.67 geometric - 3.5 offset. The height is unchanged, so the
+ * block now totals 54.55mm rather than 56.55mm and the row beneath it — seals,
+ * portrait, signature — rises by the same 3.5mm. One offset, whole sheet.
  */
 .pc-values {
-	padding-top: 15.67mm;
+	padding-top: 12.17mm;
+	height: 42.38mm;
 	margin: 0;
 }
 
 /**
  * 2.92mm of margin under a 3.89mm line box gives the stock's 6.812mm pitch.
- * The left padding clears the printed numeral, which ends at 15.33mm.
+ *
+ * 21.35mm = 17.6 geometric + 3.75 offset. The printed numeral ends at 15.33mm.
  */
 .pc-value {
-	padding-left: 17.6mm;
+	padding-left: 21.35mm;
 	margin: 0 0 2.92mm 0;
 	font-size: 9.19pt;
 	line-height: 1.2;
@@ -112,10 +140,15 @@
  * The first box runs y 59.27-76.03mm and they repeat every 18.27mm. A 14.8mm
  * seal centred in that box starts 60.25mm down the page, so 3.70mm below this
  * row's own top, and each one after it 18.27mm further.
+ *
+ * The row above already carries the vertical offset, so only the horizontal one
+ * is applied here: 17.62mm = 13.87 geometric + 3.75 offset. The test print had
+ * these straddling the boundary between two boxes, which is the same offset
+ * showing up rather than a fault of their own.
  */
 .pc-seal {
 	height: 18.27mm;
-	padding-left: 13.87mm;
+	padding-left: 17.62mm;
 	line-height: 0;
 	font-size: 0;
 }
@@ -139,28 +172,37 @@
 }
 
 /**
- * The portrait, shifted right to sit over the stock's open panel and centred on
- * the signature rule below it (x 85.96-135.29mm, centre 110.63mm). 11.33mm of
- * lead-in puts its top at 67.88mm.
+ * The portrait, over the stock's open panel. 11.33mm of lead-in from the row
+ * above, which already carries the vertical offset.
+ *
+ * 67.19mm = 63.44 geometric + 3.75 offset. Enlarged to 36mm as well.
  */
 .pc-portrait {
 	padding-top: 11.33mm;
-	padding-left: 63.44mm;
+	padding-left: 67.19mm;
 }
 
 .pc-portrait__img {
-	width: 32.42mm;
+	width: 36mm;
 	vertical-align: top;
 }
 
 /**
- * Stamped across the portrait's lower-left corner, and larger in proportion
- * than the booklet prints it. The negative margin reaches back over the
- * portrait's last 8.48mm.
+ * Stamped across the portrait's lower-left corner, reaching back over its last
+ * 10mm — a little over a quarter of the 36mm portrait.
+ *
+ * This figure and the signature's are one decision, not two. The stamp hangs
+ * 8.3mm below the portrait, and whatever is left between there and the printed
+ * signature rule is all the signature has: at 13mm the stamp sat too far up the
+ * photograph, and at 8mm it left the signature nowhere to go but on top of it.
+ *
+ * Moved 4mm left of the portrait's edge as well, so it clips the corner rather
+ * than sitting across the face of the photograph. That is horizontal only, and
+ * so costs the signature nothing.
  */
 .pc-stamp {
-	margin-top: -8.48mm;
-	padding-left: 59.21mm;
+	margin-top: -10mm;
+	padding-left: 58.96mm;
 }
 
 .pc-stamp__img {
@@ -171,13 +213,20 @@
 /**
  * On the stock's dashed signature rule at y 128.77mm.
  *
- * The margin carries a correction the block arithmetic does not: the signature
- * artwork has its own bottom padding, so a nominal offset left its ink well
- * clear of the line. Measured off a render against the stock.
+ * Centred under the portrait: the portrait runs x 98.19-134.19mm, so its centre
+ * is 116.19mm and a 35.24mm signature starts at 98.57mm — 67.57mm into this
+ * column. Verified on a render: the ink lands within 0.1mm of the portrait's
+ * centre.
+ *
+ * The margin is measured from the stamp's bottom, so it has to be re-solved
+ * whenever the stamp moves. 0.58mm is what is left once the stamp has taken its
+ * share, and it puts the signature's ink 5.5mm clear of the printed rule: the
+ * registration offset plus about 2mm of air. It also absorbs the signature
+ * artwork's own bottom padding, which the block arithmetic does not know about.
  */
 .pc-sign {
-	margin-top: 5.3mm;
-	padding-left: 57.8mm;
+	margin-top: 0.58mm;
+	padding-left: 67.57mm;
 }
 
 .pc-sign__img {

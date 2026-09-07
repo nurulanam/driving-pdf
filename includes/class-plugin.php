@@ -134,6 +134,7 @@ final class Plugin {
 		( new Settings_Page( $this->settings ) )->register();
 		( new Download_Handler( $this->generator ) )->register();
 		( new Public_Pages( $this->generator, $this->settings ) )->register();
+		( new Thankyou_Redirect() )->register();
 		( new Email_Attachments( $this->settings, $this->generator ) )->register();
 		( new Order_List_Column( $this->generator, $order_admin ) )->register();
 	}

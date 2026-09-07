@@ -30,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
  *   4  the holder page's details
  *
  * A5, matching the stock. Every position in assets/css/print-copy.css is
- * measured off the printed pages themselves — assets/img/page-01.jpg and
+ * measured off the printed pages themselves — assets/img/demos/page-01.jpg and
  * page-23.jpg, which are stored at A4 pixel dimensions but represent A5 pages —
  * rather than taken from the booklet: the stock's field rules are 6.81mm apart
  * where the booklet sets its own 10.64mm apart at A4, so a layout derived from
