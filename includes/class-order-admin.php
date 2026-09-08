@@ -137,6 +137,7 @@ final class Order_Admin {
 		echo '</ul>';
 
 		$this->render_release( $order );
+		$this->render_email_state( $order );
 
 		if ( is_string( $error ) && '' !== $error ) {
 			printf(
@@ -182,6 +183,64 @@ final class Order_Admin {
 					/* translators: %s: a date and time. */
 					? sprintf( __( 'Available to them from %s. Your links above work now.', 'idta-pdf' ), $when )
 					: __( 'The order is not paid, so there is nothing to time the wait from. Your links above work now.', 'idta-pdf' )
+			)
+		);
+	}
+
+	/**
+	 * Say what became of the permit-ready email.
+	 *
+	 * Sending happens out of sight, on a schedule, so without this the only
+	 * evidence of a failure is the customer saying they never received it.
+	 *
+	 * @param \WC_Order $order Order object.
+	 */
+	private function render_email_state( \WC_Order $order ): void {
+		$sent = (string) $order->get_meta( Release_Email::SENT_META, true );
+
+		if ( '' !== $sent ) {
+			printf(
+				'<p style="margin:0 0 10px;"><small>%s</small></p>',
+				esc_html(
+					sprintf(
+						/* translators: %s: a date and time. */
+						__( 'Permit email sent %s.', 'idta-pdf' ),
+						(string) wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $sent )
+					)
+				)
+			);
+
+			return;
+		}
+
+		$attempts = (int) $order->get_meta( Release_Notifier::ATTEMPTS_META, true );
+
+		if ( $attempts > 0 ) {
+			printf(
+				'<p style="margin:0 0 10px;color:#b32d2e;"><small>%s</small></p>',
+				esc_html(
+					sprintf(
+						/* translators: %d: number of attempts. */
+						_n(
+							'Permit email failed after %d attempt. Use "Resend order emails" to try again.',
+							'Permit email failed after %d attempts. Use "Resend order emails" to try again.',
+							$attempts,
+							'idta-pdf'
+						),
+						$attempts
+					)
+				)
+			);
+
+			return;
+		}
+
+		printf(
+			'<p style="margin:0 0 10px;"><small>%s</small></p>',
+			esc_html(
+				$this->releases->is_released( $order )
+					? __( 'Permit email not sent yet.', 'idta-pdf' )
+					: __( 'Permit email goes out when the order is released.', 'idta-pdf' )
 			)
 		);
 	}

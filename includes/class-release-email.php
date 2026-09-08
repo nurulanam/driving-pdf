@@ -138,6 +138,12 @@ final class Release_Email extends \WC_Email {
 	/**
 	 * Values shared by both templates.
 	 *
+	 * Only ever reached with an order in hand: the two content methods return
+	 * early without one, so the templates can use $order without guarding it.
+	 * That matters because WooCommerce asks an email for its content in places
+	 * that have no order — the settings screen's preview among them — and a
+	 * template dereferencing null there would take the page down.
+	 *
 	 * @return array<string,mixed>
 	 */
 	private function template_args(): array {
@@ -265,6 +271,10 @@ final class Release_Email extends \WC_Email {
 	 * @return string
 	 */
 	public function get_content_html(): string {
+		if ( ! $this->object instanceof \WC_Order ) {
+			return '';
+		}
+
 		return wc_get_template_html( $this->template_html, $this->template_args(), '', $this->template_base );
 	}
 
@@ -274,6 +284,10 @@ final class Release_Email extends \WC_Email {
 	 * @return string
 	 */
 	public function get_content_plain(): string {
+		if ( ! $this->object instanceof \WC_Order ) {
+			return '';
+		}
+
 		$args = $this->template_args();
 
 		$args['plain_text'] = true;

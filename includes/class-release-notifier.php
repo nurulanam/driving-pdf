@@ -32,6 +32,16 @@ final class Release_Notifier {
 	public const HOOK = 'idta_pdf_send_release_email';
 
 	/**
+	 * Order meta counting how many times sending has been attempted.
+	 */
+	public const ATTEMPTS_META = '_idta_pdf_permit_email_attempts';
+
+	/**
+	 * How many times to try before giving up on an order.
+	 */
+	private const MAX_ATTEMPTS = 3;
+
+	/**
 	 * Release rules.
 	 *
 	 * @var Release_Schedule
@@ -208,26 +218,65 @@ final class Release_Notifier {
 		}
 
 		/*
-		 * Marked before sending, not after. A mailer that throws or times out
-		 * mid-send can still have delivered the message, and a duplicate "your
-		 * permit is ready" is worse than a missing one the customer can ask for
-		 * — the links are on their account page and the order screen regardless.
+		 * The attempt is recorded before the send and the success after it, so
+		 * the two are separate facts.
+		 *
+		 * Recording the attempt first is what makes a hard failure survivable:
+		 * if the send dies outright — a fatal somewhere in the mail stack, a
+		 * host that kills the request — this order has still used one of its
+		 * tries rather than looping forever on the next status change.
+		 *
+		 * Recording success only on success is what stops a broken send from
+		 * silently marking every order as notified. An earlier version marked
+		 * the order before sending, to guard against a timeout delivering the
+		 * mail twice, and the cost of that trade was steep: when sending broke
+		 * for an unrelated reason, every order was flagged as told and none
+		 * could ever be retried. A rare duplicate is the lesser problem, and
+		 * MAX_ATTEMPTS caps it.
 		 */
-		$order->update_meta_data( Release_Email::SENT_META, time() );
+		$attempts = (int) $order->get_meta( self::ATTEMPTS_META, true ) + 1;
+
+		$order->update_meta_data( self::ATTEMPTS_META, $attempts );
 		$order->save_meta_data();
 
-		$email->trigger( $order->get_id(), $order );
+		$sent = $email->trigger( $order->get_id(), $order );
+
+		if ( $sent ) {
+			$order->update_meta_data( Release_Email::SENT_META, time() );
+			$order->save_meta_data();
+
+			return;
+		}
+
+		$order->add_order_note(
+			sprintf(
+				/* translators: 1: attempt number, 2: maximum attempts. */
+				__( 'The permit-ready email could not be sent (attempt %1$d of %2$d).', 'idta-pdf' ),
+				$attempts,
+				self::MAX_ATTEMPTS
+			)
+		);
 	}
 
 	/**
-	 * Whether this order has already been told.
+	 * Whether this order should be left alone.
+	 *
+	 * Either it has been told, or it has been tried enough times: a store whose
+	 * mail is misconfigured should not have every status change queue another
+	 * doomed attempt. An operator can still send it by hand from the order
+	 * screen's "Resend order emails", which goes straight to the email and does
+	 * not consult any of this.
 	 *
 	 * @param \WC_Order $order Order object.
 	 *
 	 * @return bool
 	 */
 	private function already_sent( \WC_Order $order ): bool {
-		return '' !== (string) $order->get_meta( Release_Email::SENT_META, true );
+		if ( '' !== (string) $order->get_meta( Release_Email::SENT_META, true ) ) {
+			return true;
+		}
+
+		return (int) $order->get_meta( self::ATTEMPTS_META, true ) >= self::MAX_ATTEMPTS;
 	}
 
 	/**

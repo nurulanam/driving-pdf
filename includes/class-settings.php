@@ -340,6 +340,29 @@ final class Settings {
 	}
 
 	/**
+	 * Email IDs that receive the documents as attachments.
+	 *
+	 * Deprecated, and deliberately still here. Attachments were removed when
+	 * documents stopped being stored — there is no file to attach — but the
+	 * class that called this, Email_Attachments, was hooked to
+	 * `woocommerce_email_attachments`, which runs on every email the store
+	 * sends. Updating a plugin by uploading it over the existing folder
+	 * overwrites files and deletes nothing, so that class can still be sitting
+	 * on a server, and without this method it would call one that no longer
+	 * exists and take down every outgoing email with it.
+	 *
+	 * Returning an empty list makes that stale code return immediately and
+	 * attach nothing, which is the correct behaviour now anyway.
+	 *
+	 * @deprecated Documents are rendered on request and never stored.
+	 *
+	 * @return string[] Always empty.
+	 */
+	public function attachment_emails(): array {
+		return array();
+	}
+
+	/**
 	 * Custom CSS shared by both documents.
 	 *
 	 * @return string

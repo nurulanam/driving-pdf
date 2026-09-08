@@ -177,8 +177,50 @@ final class Plugin {
 		Public_Pages::ensure_pages();
 		$this->adopt_new_documents();
 		$this->discard_stored_documents();
+		$this->remove_orphaned_files();
 
 		update_option( self::VERSION_OPTION, VERSION );
+	}
+
+	/**
+	 * Delete plugin files that earlier versions shipped and this one does not.
+	 *
+	 * Updating a plugin by uploading it over the existing folder — which is how
+	 * this one is usually updated — overwrites every file in the new copy and
+	 * removes nothing else. A class that has been deleted from the source
+	 * therefore stays on the server, and a deleted class that registered a
+	 * WordPress hook keeps registering it.
+	 *
+	 * That is not hypothetical. Email_Attachments hooked
+	 * `woocommerce_email_attachments`, which runs on every email the store
+	 * sends, and it called methods that no longer exist — so a leftover copy
+	 * stopped the store sending any email at all. Removing the file is the only
+	 * thing that fixes that for good; Settings::attachment_emails() and
+	 * Generator::generated_documents() survive as stubs to keep such a copy
+	 * harmless until this has run.
+	 */
+	private function remove_orphaned_files(): void {
+		$orphans = array(
+			// Removed when documents stopped being stored: with nothing on disk
+			// there is no file to attach to an email.
+			'includes/class-email-attachments.php',
+		);
+
+		$base = plugin_dir_path( PLUGIN_FILE );
+
+		foreach ( $orphans as $orphan ) {
+			$path = $base . $orphan;
+
+			// Confined to this plugin's own directory, and only to the names
+			// listed above — never anything derived from input.
+			if ( ! is_file( $path ) || ! str_starts_with( wp_normalize_path( $path ), wp_normalize_path( $base ) ) ) {
+				continue;
+			}
+
+			if ( wp_delete_file_from_directory( $path, $base ) ) {
+				$this->log( sprintf( 'Removed orphaned file %s left by an earlier version.', $orphan ) );
+			}
+		}
 	}
 
 	/**

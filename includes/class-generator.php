@@ -399,6 +399,27 @@ final class Generator {
 	}
 
 	/**
+	 * Documents already generated for an order.
+	 *
+	 * Deprecated, and kept for the same reason as
+	 * Settings::attachment_emails(): code from an earlier version may still be
+	 * on the server after an in-place update, and calling a method that no
+	 * longer exists is a fatal error rather than a missing feature. An empty
+	 * list reads, correctly, as "nothing is stored".
+	 *
+	 * @deprecated Documents are rendered on request and never stored.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return array<string,string> Always empty.
+	 */
+	public function generated_documents( \WC_Order $order ): array {
+		unset( $order );
+
+		return array();
+	}
+
+	/**
 	 * Record a generation failure on the order and in the log.
 	 *
 	 * @param \WC_Order  $order     Order object.
