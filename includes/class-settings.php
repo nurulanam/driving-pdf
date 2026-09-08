@@ -71,6 +71,15 @@ final class Settings {
 			// keep working without a trip to this screen first.
 			'asset_sources'    => Order_Data::SOURCES,
 			'grayscale_ghost'  => true,
+			/*
+			 * Generation is deferred, and how long by depends on what was
+			 * bought: an order containing one of the rush products is built
+			 * within minutes, everything else waits. Both delays are in
+			 * minutes, and are measured from payment.
+			 */
+			'rush_products'    => array( 20 ),
+			'rush_delay'       => 5,
+			'standard_delay'   => 240,
 			/**
 			 * Bitmap card faces, off by default. They are only wanted where the
 			 * card is printed on a direct-to-card printer, they need a PDF
@@ -176,6 +185,34 @@ final class Settings {
 
 		$clean['asset_sources'] = $this->sanitize_sources( (array) ( $input['asset_sources'] ?? array() ) );
 
+		/*
+		 * Product IDs arrive as the comma-separated list the field shows. Zero
+		 * and anything non-numeric is dropped rather than kept as 0, which
+		 * would otherwise match nothing and read like a configured rule.
+		 */
+		$rush_products = $input['rush_products'] ?? $defaults['rush_products'];
+
+		if ( ! is_array( $rush_products ) ) {
+			$rush_products = preg_split( '/[^0-9]+/', (string) $rush_products ) ?: array();
+		}
+
+		$clean['rush_products'] = array_values(
+			array_unique(
+				array_filter( array_map( 'absint', $rush_products ) )
+			)
+		);
+
+		/*
+		 * A delay of zero is meaningful — build it immediately — so these are
+		 * only floored, not defaulted when empty. The ceiling is a week, which
+		 * stops a stray keystroke parking an order's documents out of reach.
+		 */
+		foreach ( array( 'rush_delay', 'standard_delay' ) as $delay_key ) {
+			$minutes = isset( $input[ $delay_key ] ) ? absint( $input[ $delay_key ] ) : (int) $defaults[ $delay_key ];
+
+			$clean[ $delay_key ] = min( $minutes, 7 * 24 * 60 );
+		}
+
 		$clean['grayscale_ghost'] = ! empty( $input['grayscale_ghost'] );
 		$clean['card_bmp']        = ! empty( $input['card_bmp'] );
 		$clean['debug_html']      = ! empty( $input['debug_html'] );
@@ -262,6 +299,37 @@ final class Settings {
 		$statuses = array_values( array_filter( array_map( 'strval', $statuses ) ) );
 
 		return array() !== $statuses ? $statuses : array( 'processing' );
+	}
+
+	/**
+	 * Product IDs that make an order a rush job.
+	 *
+	 * @return int[]
+	 */
+	public function rush_products(): array {
+		return array_values(
+			array_unique(
+				array_filter( array_map( 'absint', (array) $this->get( 'rush_products', array() ) ) )
+			)
+		);
+	}
+
+	/**
+	 * How long to wait before generating a rush order's documents, in seconds.
+	 *
+	 * @return int
+	 */
+	public function rush_delay(): int {
+		return absint( $this->get( 'rush_delay', 5 ) ) * MINUTE_IN_SECONDS;
+	}
+
+	/**
+	 * How long to wait before generating any other order's documents, in seconds.
+	 *
+	 * @return int
+	 */
+	public function standard_delay(): int {
+		return absint( $this->get( 'standard_delay', 240 ) ) * MINUTE_IN_SECONDS;
 	}
 
 	/**

@@ -27,6 +27,16 @@ final class Plugin {
 	private const VERSION_OPTION = 'idta_pdf_version';
 
 	/**
+	 * Order meta recording whether the queued run was timed from payment.
+	 *
+	 * An order queued before it was paid was timed from the moment it was
+	 * placed, because there was no payment to count from yet. This records that
+	 * so the run can be re-timed once payment does arrive — see
+	 * schedule_generation().
+	 */
+	private const SCHEDULED_FROM_PAYMENT_META = '_idta_pdf_scheduled_from_payment';
+
+	/**
 	 * Sole instance.
 	 *
 	 * @var Plugin|null
@@ -264,17 +274,163 @@ final class Plugin {
 			return;
 		}
 
+		$paid = $this->paid_time( $order );
+
+		/*
+		 * Timed from payment, per the store's rules, so the wait is the same
+		 * whether the customer paid at once or followed a pay link days later.
+		 * An order with no payment recorded — one an operator completed by hand,
+		 * or a gateway that reports none — is timed from now instead, which is
+		 * the only other moment available.
+		 */
+		$target = ( 0 !== $paid ? $paid : time() ) + $this->generation_delay( $order );
+
 		if ( $this->is_queued( $order_id ) ) {
-			return;
+			/*
+			 * Already queued. Leave it be, unless it was queued before payment
+			 * and payment has since arrived: that run was timed from the wrong
+			 * moment, so it is re-timed now. This can happen at most once per
+			 * order, because a paid order records the fact below, so repeated
+			 * status changes cannot keep pushing the run further out.
+			 */
+			if ( 0 === $paid || $order->get_meta( self::SCHEDULED_FROM_PAYMENT_META, true ) ) {
+				return;
+			}
+
+			$this->unschedule( $order_id );
 		}
 
-		if ( function_exists( 'as_enqueue_async_action' ) ) {
+		$this->enqueue( $order_id, $target );
+
+		/*
+		 * Recorded even when it is false, so is_queued()'s branch above can
+		 * tell "queued before payment" from "queued after payment" rather than
+		 * from the absence of a value.
+		 */
+		$order->update_meta_data( self::SCHEDULED_FROM_PAYMENT_META, 0 !== $paid ? 'yes' : '' );
+		$order->save_meta_data();
+	}
+
+	/**
+	 * When an order was paid, as a Unix timestamp.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return int Zero when the order records no payment.
+	 */
+	private function paid_time( \WC_Order $order ): int {
+		$paid = $order->get_date_paid();
+
+		return null !== $paid ? (int) $paid->getTimestamp() : 0;
+	}
+
+	/**
+	 * How long after payment an order's documents should be built, in seconds.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return int
+	 */
+	private function generation_delay( \WC_Order $order ): int {
+		$rush = $this->is_rush( $order );
+
+		$delay = $rush
+			? $this->settings->rush_delay()
+			: $this->settings->standard_delay();
+
+		/**
+		 * Filters how long after payment an order's documents are built.
+		 *
+		 * @param int       $delay Delay in seconds.
+		 * @param bool      $rush  Whether the order counts as a rush job.
+		 * @param \WC_Order $order Order object.
+		 */
+		return max( 0, (int) apply_filters( 'idta_pdf_generation_delay', $delay, $rush, $order ) );
+	}
+
+	/**
+	 * Whether an order contains a product that makes it a rush job.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return bool
+	 */
+	private function is_rush( \WC_Order $order ): bool {
+		$rush_products = $this->settings->rush_products();
+		$is_rush       = false;
+
+		if ( array() !== $rush_products ) {
+			foreach ( $order->get_items() as $item ) {
+				if ( ! $item instanceof \WC_Order_Item_Product ) {
+					continue;
+				}
+
+				/*
+				 * The variation as well as the parent: a rush option sold as a
+				 * variation of another product carries its own ID, and a store
+				 * may well have configured either one.
+				 */
+				$ids = array_filter( array( (int) $item->get_product_id(), (int) $item->get_variation_id() ) );
+
+				if ( array() !== array_intersect( $ids, $rush_products ) ) {
+					$is_rush = true;
+
+					break;
+				}
+			}
+		}
+
+		/**
+		 * Filters whether an order is treated as a rush job.
+		 *
+		 * @param bool      $is_rush Whether the order is a rush job.
+		 * @param \WC_Order $order   Order object.
+		 */
+		return (bool) apply_filters( 'idta_pdf_is_rush_order', $is_rush, $order );
+	}
+
+	/**
+	 * Queue an order's generation to run at a given time.
+	 *
+	 * @param int $order_id Order ID.
+	 * @param int $target   Unix timestamp to run at.
+	 */
+	private function enqueue( int $order_id, int $target ): void {
+		/*
+		 * A target already in the past runs at the first opportunity rather than
+		 * being scheduled backwards. That is the normal case for a zero delay,
+		 * and for an order reaching a trigger status long after it was paid.
+		 */
+		if ( $target <= time() && function_exists( 'as_enqueue_async_action' ) ) {
 			as_enqueue_async_action( self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
 
 			return;
 		}
 
-		wp_schedule_single_event( time() + 5, self::ASYNC_HOOK, array( $order_id ) );
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action( $target, self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
+
+			return;
+		}
+
+		// WP-Cron fallback. It only runs on a visit, so the documents appear on
+		// the first request after the target rather than exactly on it.
+		wp_schedule_single_event( max( $target, time() + 5 ), self::ASYNC_HOOK, array( $order_id ) );
+	}
+
+	/**
+	 * Drop an order's queued generation.
+	 *
+	 * @param int $order_id Order ID.
+	 */
+	private function unschedule( int $order_id ): void {
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
+
+			return;
+		}
+
+		wp_clear_scheduled_hook( self::ASYNC_HOOK, array( $order_id ) );
 	}
 
 	/**
