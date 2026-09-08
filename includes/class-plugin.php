@@ -17,7 +17,11 @@ defined( 'ABSPATH' ) || exit;
 final class Plugin {
 
 	/**
-	 * Async action hook used to generate documents off the checkout request.
+	 * Action hook older versions queued generation on.
+	 *
+	 * Nothing schedules it any more — documents are rendered when their URL is
+	 * requested — but it is still named here so deactivation and the upgrade
+	 * routine can clear anything an earlier version left in the queue.
 	 */
 	public const ASYNC_HOOK = 'idta_pdf_generate_documents';
 
@@ -25,16 +29,6 @@ final class Plugin {
 	 * Option recording the version whose one-time setup has already run.
 	 */
 	private const VERSION_OPTION = 'idta_pdf_version';
-
-	/**
-	 * Order meta recording whether the queued run was timed from payment.
-	 *
-	 * An order queued before it was paid was timed from the moment it was
-	 * placed, because there was no payment to count from yet. This records that
-	 * so the run can be re-timed once payment does arrive — see
-	 * schedule_generation().
-	 */
-	private const SCHEDULED_FROM_PAYMENT_META = '_idta_pdf_scheduled_from_payment';
 
 	/**
 	 * Sole instance.
@@ -58,6 +52,13 @@ final class Plugin {
 	private Generator $generator;
 
 	/**
+	 * Release rules.
+	 *
+	 * @var Release_Schedule
+	 */
+	private Release_Schedule $releases;
+
+	/**
 	 * Whether boot() has already run.
 	 *
 	 * @var bool
@@ -70,6 +71,7 @@ final class Plugin {
 	private function __construct() {
 		$this->settings  = new Settings();
 		$this->generator = new Generator( $this->settings );
+		$this->releases  = new Release_Schedule( $this->settings );
 	}
 
 	/**
@@ -92,6 +94,15 @@ final class Plugin {
 	 */
 	public function settings(): Settings {
 		return $this->settings;
+	}
+
+	/**
+	 * Release rules accessor.
+	 *
+	 * @return Release_Schedule
+	 */
+	public function releases(): Release_Schedule {
+		return $this->releases;
 	}
 
 	/**
@@ -123,30 +134,31 @@ final class Plugin {
 
 		add_action( 'init', array( $this, 'maybe_upgrade' ), 5 );
 
-		// Primary trigger: generate as soon as the order is placed, whatever
-		// its payment status. Covers both the classic checkout and the
-		// block-based Store API checkout.
-		add_action( 'woocommerce_checkout_order_processed', array( $this, 'schedule_generation' ), 20, 1 );
-		add_action( 'woocommerce_store_api_checkout_order_processed', array( $this, 'schedule_generation' ), 20, 1 );
+		/*
+		 * Nothing is hooked to the checkout or to an order's status any more.
+		 * Documents are not built ahead of time and not stored: each one is
+		 * rendered by Download_Handler when its URL is requested, and whether
+		 * that URL is allowed yet is Release_Schedule's decision.
+		 */
 
-		foreach ( $this->settings->trigger_statuses() as $status ) {
-			add_action( 'woocommerce_order_status_' . $status, array( $this, 'schedule_generation' ), 20, 1 );
-		}
+		$downloads = new Download_Handler( $this->generator, $this->releases );
 
-		// Async worker, plus the WP-Cron fallback signature.
-		add_action( self::ASYNC_HOOK, array( $this, 'run_generation' ), 10, 1 );
-
-		$order_admin = new Order_Admin( $this->generator );
-		$order_admin->register();
+		( new Order_Admin( $this->generator, $this->releases, $downloads ) )->register();
 
 		( new Order_Fields() )->register();
+		( new Product_Names() )->register();
 
 		( new Settings_Page( $this->settings ) )->register();
-		( new Download_Handler( $this->generator ) )->register();
-		( new Public_Pages( $this->generator, $this->settings ) )->register();
+		$downloads->register();
+		( new Public_Pages( $this->generator, $this->settings, $this->releases ) )->register();
 		( new Thankyou_Redirect() )->register();
-		( new Email_Attachments( $this->settings, $this->generator ) )->register();
-		( new Order_List_Column( $this->generator, $order_admin ) )->register();
+
+		/*
+		 * The one scheduled job that remains. It builds nothing — it sends the
+		 * email that tells the customer their permit links have started working.
+		 */
+		( new Release_Notifier( $this->releases ) )->register();
+		( new Order_List_Column( $this->generator, $downloads, $this->releases ) )->register();
 	}
 
 	/**
@@ -164,8 +176,79 @@ final class Plugin {
 
 		Public_Pages::ensure_pages();
 		$this->adopt_new_documents();
+		$this->discard_stored_documents();
 
 		update_option( self::VERSION_OPTION, VERSION );
+	}
+
+	/**
+	 * Delete the documents earlier versions stored, and anything they queued.
+	 */
+	private function discard_stored_documents(): void {
+		/*
+		 * Earlier versions rendered every document when the order was placed and
+		 * kept it under uploads/idta-pdf/<order>/. Nothing reads those files any
+		 * more — a document is rendered when its URL is asked for — so they are
+		 * dead weight, and a booklet is several megabytes apiece. They are also
+		 * the copies most likely to go stale, since an order edited afterwards
+		 * would still have handed out the old render.
+		 *
+		 * Anything an earlier version queued is dropped too, so a pending job
+		 * cannot wake up and write a file back after this has cleaned up.
+		 */
+		wp_clear_scheduled_hook( self::ASYNC_HOOK );
+		wp_clear_scheduled_hook( Release_Notifier::HOOK );
+
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::ASYNC_HOOK, array(), 'idta-pdf' );
+		}
+
+		$filesystem = $this->generator->filesystem();
+		$base       = $filesystem->base_dir();
+
+		if ( '' === $base || ! is_dir( $base ) ) {
+			return;
+		}
+
+		/*
+		 * Walked on disk rather than read from each order's meta: the meta only
+		 * names the orders WooCommerce can still load, and a store that has
+		 * since deleted or trashed an order would keep its files for good.
+		 * Deleting is confined to what this plugin itself wrote — is_managed()
+		 * checks the path is inside the plugin's own directory — and only the
+		 * two extensions it ever produced.
+		 */
+		$removed = 0;
+
+		foreach ( (array) glob( trailingslashit( $base ) . '*/*.{pdf,bmp,html}', GLOB_BRACE ) as $file ) {
+			$file = (string) $file;
+
+			if ( ! $filesystem->is_managed( $file ) || ! is_file( $file ) ) {
+				continue;
+			}
+
+			if ( $filesystem->delete( $file ) ) {
+				++$removed;
+			}
+		}
+
+		if ( $removed > 0 ) {
+			$this->log(
+				sprintf( 'Removed %d stored document(s); documents are now rendered on request.', $removed )
+			);
+		}
+	}
+
+	/**
+	 * Write a line to the debug log.
+	 *
+	 * @param string $message Message.
+	 */
+	private function log( string $message ): void {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[idta-pdf] ' . $message );
+		}
 	}
 
 	/**
@@ -222,291 +305,8 @@ final class Plugin {
 
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::ASYNC_HOOK );
+			as_unschedule_all_actions( Release_Notifier::HOOK );
 		}
-	}
-
-	/**
-	 * Queue document generation from a `woocommerce_after_order_object_save`
-	 * callback, which passes the order object rather than its ID.
-	 *
-	 * @param \WC_Order $order Order object.
-	 */
-	public function schedule_generation_for_order( $order ): void {
-		if ( $order instanceof \WC_Order ) {
-			$this->schedule_generation( $order->get_id() );
-		}
-	}
-
-	/**
-	 * Queue document generation for an order.
-	 *
-	 * @param int $order_id Order ID.
-	 */
-	public function schedule_generation( $order_id ): void {
-		$order_id = absint( $order_id );
-
-		if ( ! $order_id ) {
-			return;
-		}
-
-		$order = wc_get_order( $order_id );
-
-		if ( ! $order instanceof \WC_Order ) {
-			return;
-		}
-
-		// Nothing to build until the IDP meta has been written.
-		if ( ! Order_Data::has_data( $order ) ) {
-			return;
-		}
-
-		if ( $this->generator->is_generated( $order ) ) {
-			return;
-		}
-
-		/**
-		 * Filters whether an order should produce IDP documents.
-		 *
-		 * @param bool      $should_generate Whether to generate.
-		 * @param \WC_Order $order           Order object.
-		 */
-		if ( ! apply_filters( 'idta_pdf_should_generate', true, $order ) ) {
-			return;
-		}
-
-		$paid = $this->paid_time( $order );
-
-		/*
-		 * Timed from payment, per the store's rules, so the wait is the same
-		 * whether the customer paid at once or followed a pay link days later.
-		 * An order with no payment recorded — one an operator completed by hand,
-		 * or a gateway that reports none — is timed from now instead, which is
-		 * the only other moment available.
-		 */
-		$target = ( 0 !== $paid ? $paid : time() ) + $this->generation_delay( $order );
-
-		if ( $this->is_queued( $order_id ) ) {
-			/*
-			 * Already queued. Leave it be, unless it was queued before payment
-			 * and payment has since arrived: that run was timed from the wrong
-			 * moment, so it is re-timed now. This can happen at most once per
-			 * order, because a paid order records the fact below, so repeated
-			 * status changes cannot keep pushing the run further out.
-			 */
-			if ( 0 === $paid || $order->get_meta( self::SCHEDULED_FROM_PAYMENT_META, true ) ) {
-				return;
-			}
-
-			$this->unschedule( $order_id );
-		}
-
-		$this->enqueue( $order_id, $target );
-
-		/*
-		 * Recorded even when it is false, so is_queued()'s branch above can
-		 * tell "queued before payment" from "queued after payment" rather than
-		 * from the absence of a value.
-		 */
-		$order->update_meta_data( self::SCHEDULED_FROM_PAYMENT_META, 0 !== $paid ? 'yes' : '' );
-		$order->save_meta_data();
-	}
-
-	/**
-	 * When an order was paid, as a Unix timestamp.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return int Zero when the order records no payment.
-	 */
-	private function paid_time( \WC_Order $order ): int {
-		$paid = $order->get_date_paid();
-
-		return null !== $paid ? (int) $paid->getTimestamp() : 0;
-	}
-
-	/**
-	 * How long after payment an order's documents should be built, in seconds.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return int
-	 */
-	private function generation_delay( \WC_Order $order ): int {
-		$rush = $this->is_rush( $order );
-
-		$delay = $rush
-			? $this->settings->rush_delay()
-			: $this->settings->standard_delay();
-
-		/**
-		 * Filters how long after payment an order's documents are built.
-		 *
-		 * @param int       $delay Delay in seconds.
-		 * @param bool      $rush  Whether the order counts as a rush job.
-		 * @param \WC_Order $order Order object.
-		 */
-		return max( 0, (int) apply_filters( 'idta_pdf_generation_delay', $delay, $rush, $order ) );
-	}
-
-	/**
-	 * Whether an order contains a product that makes it a rush job.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return bool
-	 */
-	private function is_rush( \WC_Order $order ): bool {
-		$rush_products = $this->settings->rush_products();
-		$is_rush       = false;
-
-		if ( array() !== $rush_products ) {
-			foreach ( $order->get_items() as $item ) {
-				if ( ! $item instanceof \WC_Order_Item_Product ) {
-					continue;
-				}
-
-				/*
-				 * The variation as well as the parent: a rush option sold as a
-				 * variation of another product carries its own ID, and a store
-				 * may well have configured either one.
-				 */
-				$ids = array_filter( array( (int) $item->get_product_id(), (int) $item->get_variation_id() ) );
-
-				if ( array() !== array_intersect( $ids, $rush_products ) ) {
-					$is_rush = true;
-
-					break;
-				}
-			}
-		}
-
-		/**
-		 * Filters whether an order is treated as a rush job.
-		 *
-		 * @param bool      $is_rush Whether the order is a rush job.
-		 * @param \WC_Order $order   Order object.
-		 */
-		return (bool) apply_filters( 'idta_pdf_is_rush_order', $is_rush, $order );
-	}
-
-	/**
-	 * Queue an order's generation to run at a given time.
-	 *
-	 * @param int $order_id Order ID.
-	 * @param int $target   Unix timestamp to run at.
-	 */
-	private function enqueue( int $order_id, int $target ): void {
-		/*
-		 * A target already in the past runs at the first opportunity rather than
-		 * being scheduled backwards. That is the normal case for a zero delay,
-		 * and for an order reaching a trigger status long after it was paid.
-		 */
-		if ( $target <= time() && function_exists( 'as_enqueue_async_action' ) ) {
-			as_enqueue_async_action( self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
-
-			return;
-		}
-
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action( $target, self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
-
-			return;
-		}
-
-		// WP-Cron fallback. It only runs on a visit, so the documents appear on
-		// the first request after the target rather than exactly on it.
-		wp_schedule_single_event( max( $target, time() + 5 ), self::ASYNC_HOOK, array( $order_id ) );
-	}
-
-	/**
-	 * Drop an order's queued generation.
-	 *
-	 * @param int $order_id Order ID.
-	 */
-	private function unschedule( int $order_id ): void {
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
-
-			return;
-		}
-
-		wp_clear_scheduled_hook( self::ASYNC_HOOK, array( $order_id ) );
-	}
-
-	/**
-	 * Generate documents for an order.
-	 *
-	 * Accepts both the Action Scheduler named argument and the WP-Cron
-	 * positional argument.
-	 *
-	 * @param int|array<string,mixed> $order_id Order ID or argument bag.
-	 */
-	public function run_generation( $order_id ): void {
-		if ( is_array( $order_id ) ) {
-			$order_id = $order_id['order_id'] ?? 0;
-		}
-
-		$order = wc_get_order( absint( $order_id ) );
-
-		if ( ! $order instanceof \WC_Order ) {
-			return;
-		}
-
-		$this->raise_limits();
-
-		try {
-			$this->generator->generate( $order );
-		} catch ( \Throwable $exception ) {
-			$this->generator->log_failure( $order, $exception );
-		}
-	}
-
-	/**
-	 * Give the worker the headroom the booklet needs.
-	 *
-	 * The booklet is by far the heavier document — 24 pages, ten embedded font
-	 * subsets and the flag artwork, against the card's two pages — so it is the
-	 * one that runs out of memory or time first. This matters because it runs in
-	 * a WP-Cron or Action Scheduler request, which gets PHP's bare defaults, while
-	 * the manual button on the order screen runs in wp-admin, where WordPress has
-	 * already raised the memory limit to WP_MAX_MEMORY_LIMIT. That difference is
-	 * enough to make the booklet fail on a schedule and succeed on a click.
-	 *
-	 * Both calls only ever raise a limit, and both are filterable — the memory one
-	 * through `idta_pdf_memory_limit`, the time budget through
-	 * `idta_pdf_time_limit`. A host that forbids either is left as it is.
-	 */
-	private function raise_limits(): void {
-		if ( function_exists( 'wp_raise_memory_limit' ) ) {
-			wp_raise_memory_limit( 'idta_pdf' );
-		}
-
-		/**
-		 * Filters the seconds allowed for one generation run.
-		 *
-		 * @param int $seconds Time limit. Zero leaves the limit untouched.
-		 */
-		$seconds = (int) apply_filters( 'idta_pdf_time_limit', 300 );
-
-		if ( $seconds > 0 && function_exists( 'set_time_limit' ) ) {
-			// Fails silently where it is disabled, which is the intended outcome.
-			@set_time_limit( $seconds ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-		}
-	}
-
-	/**
-	 * Determine whether generation is already queued for an order.
-	 *
-	 * @param int $order_id Order ID.
-	 *
-	 * @return bool
-	 */
-	private function is_queued( int $order_id ): bool {
-		if ( function_exists( 'as_has_scheduled_action' ) ) {
-			return as_has_scheduled_action( self::ASYNC_HOOK, array( 'order_id' => $order_id ), 'idta-pdf' );
-		}
-
-		return (bool) wp_next_scheduled( self::ASYNC_HOOK, array( $order_id ) );
 	}
 
 	/**

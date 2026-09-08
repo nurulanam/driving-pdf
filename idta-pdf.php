@@ -3,7 +3,7 @@
  * Plugin Name:       IDTA PDF
  * Plugin URI:        https://am2am.com
  * Description:       Generates the International Driving Permit booklet (A4) and ID card (85.6 × 53.98 mm) PDFs from WooCommerce order meta.
- * Version:           1.4.0
+ * Version:           1.7.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            am2am software
@@ -25,7 +25,7 @@ namespace IDTA\PDF;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION     = '1.4.0';
+const VERSION     = '1.7.1';
 const PLUGIN_FILE = __FILE__;
 
 require_once __DIR__ . '/includes/class-autoloader.php';

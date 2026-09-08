@@ -1,6 +1,6 @@
 <?php
 /**
- * Rasterises the card to bitmaps for a direct-to-card printer.
+ * Rasterises the card to a bitmap for a direct-to-card printer.
  *
  * @package IDTA\PDF
  */
@@ -12,7 +12,7 @@ namespace IDTA\PDF;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The card's two faces as 24-bit RGB bitmaps, one pixel per printer dot.
+ * The card's front as a 24-bit RGB bitmap, one pixel per printer dot.
  *
  * A retransfer or dye-sublimation card printer — a Zebra ZC300, say — prints a
  * 300dpi grid and its driver resamples whatever it is handed to fit. Handing it
@@ -22,15 +22,19 @@ defined( 'ABSPATH' ) || exit;
  * at 1011 x 638 removes both steps, so a stem drawn one dot wide prints one dot
  * wide.
  *
- * A face is written as its own file because that is how such a printer is fed:
- * one image per side, no page furniture.
+ * Only the front is produced. The back is a fixed design — the category legend
+ * and the notes — so it is the same on every card and does not need producing
+ * per order; the front is the one carrying the holder's details.
  *
- * Rasterising a PDF needs a tool the plugin does not bundle, so this is offered
- * only where one is present — see self::rasteriser(). The card PDF stays the
- * single source of truth either way: these are renders of it, not a second
- * layout, which is what keeps the multilingual header's Arabic shaping and
- * right-to-left runs intact. Nothing in PHP's own image library can shape
- * Arabic, so redrawing the face directly was never an option.
+ * This works from the rendered card PDF rather than redrawing the face, which
+ * is what keeps the multilingual header's Arabic shaping and right-to-left runs
+ * intact: nothing in PHP's own image library can shape Arabic, so redrawing was
+ * never an option. Rasterising a PDF needs a tool the plugin does not bundle,
+ * so the export is offered only where one is present — see self::rasteriser().
+ *
+ * Nothing is written where it can be served. Both the source PDF and the
+ * intermediate raster are temporary files in the system temporary directory,
+ * deleted before the bytes are returned.
  */
 final class Card_Bitmap {
 
@@ -40,40 +44,51 @@ final class Card_Bitmap {
 	public const DPI = 300;
 
 	/**
+	 * Document slug the front face is requested under.
+	 */
+	public const FRONT_SLUG = 'card-front-bmp';
+
+	/**
+	 * Page of the card PDF the front is on.
+	 */
+	private const FRONT_PAGE = 1;
+
+	/**
 	 * Card width and height in millimetres, matching Card_Document.
 	 */
 	private const WIDTH_MM  = 85.6;
 	private const HEIGHT_MM = 53.98;
 
 	/**
-	 * Faces to write, keyed by the slug each is stored under, valued by the page
-	 * of the card PDF each comes from.
+	 * Bitmap slugs, valued by the page of the card PDF each comes from.
 	 *
-	 * Front only. The back is a fixed design — the category legend and the
-	 * notes — so it is the same on every card and does not need producing per
-	 * order; the front is the one carrying the holder's details. Adding the
-	 * back again is a single line here, since nothing else names a face.
-	 *
-	 * @var array<string,int>
+	 * @return array<string,int>
 	 */
-	private const FACES = array(
-		'card-front-bmp' => 1,
-	);
+	public static function faces(): array {
+		return array( self::FRONT_SLUG => self::FRONT_PAGE );
+	}
 
 	/**
-	 * Storage helper.
+	 * Whether a slug names a bitmap face.
 	 *
-	 * @var Filesystem
+	 * @param string $slug Document slug.
+	 *
+	 * @return bool
 	 */
-	private Filesystem $filesystem;
+	public static function is_face( string $slug ): bool {
+		return isset( self::faces()[ $slug ] );
+	}
 
 	/**
-	 * Constructor.
+	 * Filename a face is offered for download as.
 	 *
-	 * @param Filesystem $filesystem Storage helper.
+	 * @param \WC_Order $order Order object.
+	 * @param string    $slug  Document slug.
+	 *
+	 * @return string
 	 */
-	public function __construct( Filesystem $filesystem ) {
-		$this->filesystem = $filesystem;
+	public static function filename( \WC_Order $order, string $slug ): string {
+		return sprintf( '%s-%s.bmp', $slug, $order->get_order_number() );
 	}
 
 	/**
@@ -112,7 +127,7 @@ final class Card_Bitmap {
 	 */
 	public static function rasteriser(): string {
 		/**
-		 * Filters the rasteriser used to convert the card PDF to bitmaps.
+		 * Filters the rasteriser used to convert the card PDF to a bitmap.
 		 *
 		 * @param string $tool One of 'imagick', 'gs', 'pdftoppm' or ''.
 		 */
@@ -172,88 +187,61 @@ final class Card_Bitmap {
 	}
 
 	/**
-	 * Write the card's bitmap faces.
+	 * Convert a rendered card PDF into a bitmap face.
 	 *
-	 * @param \WC_Order $order Order the card belongs to.
-	 * @param string    $pdf   Absolute path to the card PDF.
+	 * @param string $pdf  The card PDF, as bytes.
+	 * @param string $slug Which face to produce.
 	 *
-	 * @return array<string,string> Absolute paths, keyed by face slug. Empty when
-	 *                              no rasteriser is available.
+	 * @return string Bitmap bytes.
+	 *
+	 * @throws Render_Exception When no rasteriser is available, or conversion fails.
 	 */
-	public function render( \WC_Order $order, string $pdf ): array {
+	public function bytes( string $pdf, string $slug ): string {
+		$page = self::faces()[ $slug ] ?? 0;
+
+		if ( 0 === $page ) {
+			throw new Render_Exception( sprintf( 'Unknown card face "%s".', $slug ) );
+		}
+
 		$tool = self::rasteriser();
 
-		if ( '' === $tool || ! self::is_available() || ! is_readable( $pdf ) ) {
-			return array();
+		if ( '' === $tool || ! self::is_available() ) {
+			throw new Render_Exception(
+				'Card bitmaps need the Imagick extension, Ghostscript or pdftoppm, and none could be used.'
+			);
 		}
 
-		$dir = $this->filesystem->order_dir( $order );
+		$source = $this->temp_file( 'pdf' );
 
-		if ( ! $this->filesystem->ensure_dir( $dir ) ) {
-			return array();
+		if ( '' === $source || false === file_put_contents( $source, $pdf ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			throw new Render_Exception( 'Could not stage the card PDF for rasterising.' );
 		}
 
-		$written = array();
-
-		foreach ( self::FACES as $slug => $page ) {
-			$path = $this->render_face( $pdf, $page, trailingslashit( $dir ) . $slug . '.bmp', $tool );
-
-			if ( '' !== $path ) {
-				$written[ $slug ] = $path;
-			}
-		}
-
-		$this->prune( $dir, array_keys( $written ) );
-
-		return $written;
-	}
-
-	/**
-	 * Delete bitmap faces this version no longer produces.
-	 *
-	 * A site that generated a back face under an earlier version would
-	 * otherwise keep a 1.9 MB file on disk and keep offering it for download
-	 * long after it stopped being rebuilt, slowly going stale against the card
-	 * it was rendered from.
-	 *
-	 * @param string   $dir  Order directory.
-	 * @param string[] $keep Face slugs just written.
-	 */
-	private function prune( string $dir, array $keep ): void {
-		foreach ( (array) glob( trailingslashit( $dir ) . '*-bmp.bmp' ) as $file ) {
-			if ( ! in_array( basename( (string) $file, '.bmp' ), $keep, true ) ) {
-				wp_delete_file( (string) $file );
-			}
+		try {
+			return $this->convert( $source, $page, $tool );
+		} finally {
+			// Removed whether the conversion worked or threw, so a failure does
+			// not leave the card's contents sitting in the temporary directory.
+			wp_delete_file( $source );
 		}
 	}
 
 	/**
-	 * Rasterise one page and write it as a 24-bit bitmap.
+	 * Rasterise one page of a staged PDF and return it as a bitmap.
 	 *
-	 * @param string $pdf    Source PDF.
-	 * @param int    $page   Page number, 1-based.
-	 * @param string $target Bitmap path to write.
-	 * @param string $tool   Rasteriser to use.
+	 * @param string $pdf  Path to the staged PDF.
+	 * @param int    $page Page number, 1-based.
+	 * @param string $tool Rasteriser to use.
 	 *
-	 * @return string The path written, or an empty string on failure.
+	 * @return string Bitmap bytes.
+	 *
+	 * @throws Render_Exception When any step fails.
 	 */
-	private function render_face( string $pdf, int $page, string $target, string $tool ): string {
-		/*
-		 * Reuse a face that is already newer than the card it came from.
-		 * generate() is called on every order transition and copies an existing
-		 * card PDF through untouched, so without this each of those would pay
-		 * for two Ghostscript runs and rewrite 4 MB to produce the same two
-		 * files. A forced regeneration rewrites the PDF, which makes it the
-		 * newer of the two and brings both faces back through here.
-		 */
-		if ( is_readable( $target ) && filemtime( $target ) >= filemtime( $pdf ) ) {
-			return $target;
-		}
-
+	private function convert( string $pdf, int $page, string $tool ): string {
 		$raw = $this->rasterise( $pdf, $page, $tool );
 
 		if ( '' === $raw || ! is_readable( $raw ) ) {
-			return '';
+			throw new Render_Exception( sprintf( 'The card PDF could not be rasterised with %s.', $tool ) );
 		}
 
 		$source = @imagecreatefromstring( (string) file_get_contents( $raw ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
@@ -261,7 +249,7 @@ final class Card_Bitmap {
 		wp_delete_file( $raw );
 
 		if ( false === $source ) {
-			return '';
+			throw new Render_Exception( 'The rasterised card could not be read as an image.' );
 		}
 
 		list( $width, $height ) = self::pixels();
@@ -318,31 +306,49 @@ final class Card_Bitmap {
 
 		imagedestroy( $source );
 
+		$target = $this->temp_file( 'bmp' );
+
+		if ( '' === $target ) {
+			imagedestroy( $canvas );
+
+			throw new Render_Exception( 'Could not open a temporary file for the bitmap.' );
+		}
+
 		// Uncompressed: RLE bitmaps are not universally read by printer drivers.
-		$ok = imagebmp( $canvas, $target, false );
+		$written = imagebmp( $canvas, $target, false );
 
 		imagedestroy( $canvas );
 
-		if ( ! $ok ) {
-			return '';
+		if ( ! $written ) {
+			wp_delete_file( $target );
+
+			throw new Render_Exception( 'The bitmap could not be written.' );
 		}
 
 		$this->stamp_resolution( $target );
 
-		return $target;
+		$bytes = (string) file_get_contents( $target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		wp_delete_file( $target );
+
+		return $bytes;
 	}
 
 	/**
 	 * Run the chosen rasteriser over one page.
 	 *
-	 * @param string $pdf  Source PDF.
+	 * @param string $pdf  Path to the staged PDF.
 	 * @param int    $page Page number, 1-based.
 	 * @param string $tool Rasteriser.
 	 *
 	 * @return string Path to a temporary raster, or an empty string.
 	 */
 	private function rasterise( string $pdf, int $page, string $tool ): string {
-		$out = trailingslashit( $this->filesystem->temp_dir() ) . 'idta-card-' . wp_generate_password( 8, false ) . '.png';
+		$out = $this->temp_file( 'png' );
+
+		if ( '' === $out ) {
+			return '';
+		}
 
 		if ( 'imagick' === $tool ) {
 			try {
@@ -422,5 +428,32 @@ final class Card_Bitmap {
 		fseek( $handle, 38 );
 		fwrite( $handle, pack( 'V2', $ppm, $ppm ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+	}
+
+	/**
+	 * Reserve a temporary file with a given extension.
+	 *
+	 * The system temporary directory, not the uploads folder: these files exist
+	 * for the length of one request and must never be reachable over HTTP.
+	 *
+	 * @param string $extension Extension, without the dot.
+	 *
+	 * @return string Absolute path, or an empty string when none could be made.
+	 */
+	private function temp_file( string $extension ): string {
+		$dir = get_temp_dir();
+
+		if ( '' === $dir || ! is_writable( $dir ) ) {
+			return '';
+		}
+
+		$path = trailingslashit( $dir ) . uniqid( 'idta-card-', true ) . '.' . $extension;
+
+		// Created now so the name cannot be claimed between here and its use.
+		if ( false === file_put_contents( $path, '' ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			return '';
+		}
+
+		return $path;
 	}
 }

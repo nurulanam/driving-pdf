@@ -9,7 +9,8 @@
  *
  * @var \WC_Order                  $order     Order object.
  * @var \IDTA\PDF\Order_Data       $data      Order data.
- * @var array<string,string>       $documents Generated document paths, keyed by slug.
+ * @var string[]                    $documents Slugs this order may be offered,
+ *                                             empty until the permit is released.
  * @var \IDTA\PDF\Download_Handler $downloads Download URL builder.
  *
  * @package IDTA\PDF

@@ -9,7 +9,9 @@
  *
  * @var \WC_Order              $order     Order object.
  * @var \IDTA\PDF\Order_Data   $data      Order data.
- * @var array<string,string>   $documents Generated document paths, keyed by slug.
+ * @var string[]                    $documents Slugs this order may be offered,
+ *                                             empty until the permit is released.
+ * @var string                      $unavailable Why it is unavailable, when it is.
  * @var \IDTA\PDF\Download_Handler $downloads Download URL builder.
  *
  * @package IDTA\PDF
@@ -38,16 +40,23 @@ $permit_labels = array(
 
 	<?php
 	/*
-	 * Only the documents that exist are offered. The download endpoint would
-	 * happily render one on demand, but that means waiting on a phone connection
-	 * for a booklet that takes a couple of seconds to build, so a missing document
-	 * says so instead.
+	 * $documents is empty until the order's permit is released, so this page
+	 * explains the wait rather than offering a link that would be refused. Once
+	 * released, following a link renders the document on the spot.
 	 */
-	$permit_available = array_intersect_key( $permit_labels, $documents );
+	$permit_available = array_intersect_key( $permit_labels, array_flip( $documents ) );
 
 	if ( array() === $permit_available ) :
 		?>
-		<p><?php esc_html_e( 'Your permit is still being prepared. Please check back shortly.', 'idta-pdf' ); ?></p>
+		<p>
+			<?php
+			echo esc_html(
+				'' !== $unavailable
+					? $unavailable
+					: __( 'Your permit is still being prepared. Please check back shortly.', 'idta-pdf' )
+			);
+			?>
+		</p>
 		<?php
 	else :
 		foreach ( $permit_available as $permit_slug => $permit_label ) :

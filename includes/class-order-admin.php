@@ -12,7 +12,13 @@ namespace IDTA\PDF;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds a document panel and actions to the order edit screen.
+ * Adds a document panel to the order edit screen.
+ *
+ * There is nothing to generate here, and nothing to rebuild. A document is
+ * rendered when its link is followed, so every link in this panel produces the
+ * order as it stands at the moment it is clicked. What the panel does have to
+ * say is when the customer can fetch the same thing, since an operator's links
+ * work immediately and the customer's do not.
  */
 final class Order_Admin {
 
@@ -24,6 +30,13 @@ final class Order_Admin {
 	private Generator $generator;
 
 	/**
+	 * Release rules.
+	 *
+	 * @var Release_Schedule
+	 */
+	private Release_Schedule $releases;
+
+	/**
 	 * Download URL builder.
 	 *
 	 * @var Download_Handler
@@ -33,11 +46,14 @@ final class Order_Admin {
 	/**
 	 * Constructor.
 	 *
-	 * @param Generator $generator Document generator.
+	 * @param Generator        $generator Document generator.
+	 * @param Release_Schedule $releases  Release rules.
+	 * @param Download_Handler $downloads Download URL builder.
 	 */
-	public function __construct( Generator $generator ) {
+	public function __construct( Generator $generator, Release_Schedule $releases, Download_Handler $downloads ) {
 		$this->generator = $generator;
-		$this->downloads = new Download_Handler( $generator );
+		$this->releases  = $releases;
+		$this->downloads = $downloads;
 	}
 
 	/**
@@ -45,67 +61,28 @@ final class Order_Admin {
 	 */
 	public function register(): void {
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ), 30, 2 );
-		add_action( 'admin_post_idta_pdf_regenerate', array( $this, 'handle_regenerate' ) );
-		add_action( 'admin_post_idta_pdf_generate_one', array( $this, 'handle_generate_one' ) );
-		add_filter( 'woocommerce_order_actions', array( $this, 'add_order_action' ), 10, 1 );
-		add_action( 'woocommerce_order_action_idta_pdf_regenerate', array( $this, 'handle_order_action' ), 10, 1 );
 	}
 
 	/**
-	 * Build the URL for the "generate a single document" action.
+	 * Document labels, shared with the orders list column.
 	 *
-	 * Shared with Order_List_Column, which offers the same action from the
-	 * orders list.
-	 *
-	 * @param \WC_Order $order Order object.
-	 * @param string    $slug  Document slug.
-	 *
-	 * @return string
+	 * @return array<string,string>
 	 */
-	public function generate_one_url( \WC_Order $order, string $slug ): string {
-		return add_query_arg(
-			'_wpnonce',
-			wp_create_nonce( 'idta-pdf-generate-one' ),
-			add_query_arg(
-				array(
-					'action'   => 'idta_pdf_generate_one',
-					'order_id' => $order->get_id(),
-					'slug'     => $slug,
-				),
-				admin_url( 'admin-post.php' )
-			)
+	public static function labels(): array {
+		return array(
+			'booklet'    => __( 'Permit booklet (A4)', 'idta-pdf' ),
+			'card'       => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
+			'print-copy' => __( 'Permit print (A5)', 'idta-pdf' ),
+			// Offered only where the server can rasterise a PDF.
+			Card_Bitmap::FRONT_SLUG => __( 'Card front (BMP, 300 dpi)', 'idta-pdf' ),
 		);
 	}
 
 	/**
-	 * Nonced URL that regenerates every document for an order.
+	 * Register the panel on the order edit screen.
 	 *
-	 * Public so the orders list column can offer the same action as the panel on
-	 * the order screen.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return string
-	 */
-	public function regenerate_url( \WC_Order $order ): string {
-		return add_query_arg(
-			'_wpnonce',
-			wp_create_nonce( 'idta-pdf-regenerate' ),
-			add_query_arg(
-				array(
-					'action'   => 'idta_pdf_regenerate',
-					'order_id' => $order->get_id(),
-				),
-				admin_url( 'admin-post.php' )
-			)
-		);
-	}
-
-	/**
-	 * Register the document panel on both legacy and HPOS order screens.
-	 *
-	 * @param string $screen_id Current screen ID.
-	 * @param mixed  $post      Post or order object.
+	 * @param string               $screen_id Screen ID.
+	 * @param \WP_Post|\WC_Order|null $post   Post or order being edited.
 	 */
 	public function add_meta_box( $screen_id, $post = null ): void {
 		$order = $this->resolve_order( $post );
@@ -125,9 +102,9 @@ final class Order_Admin {
 	}
 
 	/**
-	 * Render the document panel.
+	 * Render the panel.
 	 *
-	 * @param mixed $post Post or order object.
+	 * @param \WP_Post|\WC_Order $post Post or order being edited.
 	 */
 	public function render_meta_box( $post ): void {
 		$order = $this->resolve_order( $post );
@@ -136,62 +113,30 @@ final class Order_Admin {
 			return;
 		}
 
-		$documents = $this->generator->generated_documents( $order );
-		$requested = array_keys( $this->generator->documents_for( $order ) );
-		$error     = $order->get_meta( Generator::ERROR_META, true );
-
-		$labels = array(
-			'booklet'    => __( 'Permit booklet (A4)', 'idta-pdf' ),
-			'card'       => __( 'Permit card (85.6 × 53.98 mm)', 'idta-pdf' ),
-			'print-copy' => __( 'Permit print (A5)', 'idta-pdf' ),
-			// Written alongside the card PDF when card bitmaps are enabled, so
-			// it appears here only once it exists.
-			'card-front-bmp' => __( 'Card front (BMP, 300 dpi)', 'idta-pdf' ),
-		);
-
-		/*
-		 * The card's bitmap faces are derived from the card PDF rather than
-		 * requested in their own right, so documents_for() does not name them.
-		 * Appending whatever else is on disk lists them for download without
-		 * offering a "Generate" button that no document class could answer.
-		 */
-		$listed = array_merge(
-			$requested,
-			array_values( array_diff( array_keys( $documents ), $requested ) )
-		);
+		$labels = self::labels();
+		$slugs  = $this->generator->offered_slugs( $order );
+		$error  = $order->get_meta( Generator::ERROR_META, true );
 
 		echo '<ul style="margin:0 0 12px;">';
 
-		if ( array() === $requested ) {
+		if ( array() === $slugs ) {
 			printf(
 				'<li><em>%s</em></li>',
 				esc_html__( 'This order does not request any IDP document.', 'idta-pdf' )
 			);
 		}
 
-		foreach ( $listed as $slug ) {
-			$label = $labels[ $slug ] ?? $slug;
-
-			if ( isset( $documents[ $slug ] ) ) {
-				printf(
-					'<li style="margin-bottom:6px;"><a href="%1$s">%2$s</a><br><small>%3$s</small></li>',
-					esc_url( $this->downloads->admin_url( $order, $slug ) ),
-					esc_html( $label ),
-					esc_html( size_format( (int) ( filesize( $documents[ $slug ] ) ?: 0 ) ) )
-				);
-
-				continue;
-			}
-
+		foreach ( $slugs as $slug ) {
 			printf(
-				'<li style="margin-bottom:6px;">%1$s <a class="button button-small" href="%2$s">%3$s</a></li>',
-				esc_html( $label ),
-				esc_url( $this->generate_one_url( $order, $slug ) ),
-				esc_html__( 'Generate', 'idta-pdf' )
+				'<li style="margin-bottom:6px;"><a href="%1$s" target="_blank" rel="noopener">%2$s</a></li>',
+				esc_url( $this->downloads->admin_url( $order, $slug ) ),
+				esc_html( $labels[ $slug ] ?? $slug )
 			);
 		}
 
 		echo '</ul>';
+
+		$this->render_release( $order );
 
 		if ( is_string( $error ) && '' !== $error ) {
 			printf(
@@ -202,130 +147,49 @@ final class Order_Admin {
 		}
 
 		printf(
-			'<p><a class="button button-primary" href="%1$s">%2$s</a></p>',
-			esc_url( $this->regenerate_url( $order ) ),
-			esc_html__( 'Regenerate documents', 'idta-pdf' )
+			'<p class="description" style="margin:0;">%s</p>',
+			esc_html__( 'Documents are produced when a link is opened, so these are always up to date and nothing is stored on the server.', 'idta-pdf' )
 		);
 	}
 
 	/**
-	 * Handle the regenerate button.
-	 */
-	public function handle_regenerate(): void {
-		$order_id = isset( $_GET['order_id'] ) ? absint( wp_unslash( (string) $_GET['order_id'] ) ) : 0;
-
-		check_admin_referer( 'idta-pdf-regenerate' );
-
-		if ( ! current_user_can( 'edit_shop_orders' ) ) {
-			wp_die( esc_html__( 'You are not allowed to regenerate documents.', 'idta-pdf' ), '', array( 'response' => 403 ) );
-		}
-
-		$order = wc_get_order( $order_id );
-
-		if ( ! $order instanceof \WC_Order ) {
-			wp_die( esc_html__( 'Order not found.', 'idta-pdf' ), '', array( 'response' => 404 ) );
-		}
-
-		$notice = 'idta-pdf-regenerated';
-
-		try {
-			$this->generator->generate( $order, true );
-		} catch ( \Throwable $exception ) {
-			$this->generator->log_failure( $order, $exception );
-
-			$notice = 'idta-pdf-failed';
-		}
-
-		wp_safe_redirect(
-			add_query_arg( 'idta_pdf_notice', $notice, $order->get_edit_order_url() )
-		);
-
-		exit;
-	}
-
-	/**
-	 * Handle the per-document "Generate" button.
-	 *
-	 * Used both by the order edit screen and the orders list column, for the
-	 * common case where only one of the two documents is missing.
-	 */
-	public function handle_generate_one(): void {
-		$order_id = isset( $_GET['order_id'] ) ? absint( wp_unslash( (string) $_GET['order_id'] ) ) : 0;
-		$slug     = isset( $_GET['slug'] ) ? sanitize_key( wp_unslash( (string) $_GET['slug'] ) ) : '';
-
-		check_admin_referer( 'idta-pdf-generate-one' );
-
-		if ( ! current_user_can( 'edit_shop_orders' ) ) {
-			wp_die( esc_html__( 'You are not allowed to generate documents.', 'idta-pdf' ), '', array( 'response' => 403 ) );
-		}
-
-		$order = wc_get_order( $order_id );
-
-		if ( ! $order instanceof \WC_Order ) {
-			wp_die( esc_html__( 'Order not found.', 'idta-pdf' ), '', array( 'response' => 404 ) );
-		}
-
-		$notice = 'idta-pdf-generated';
-
-		try {
-			$this->generator->generate_one( $order, $slug );
-		} catch ( \Throwable $exception ) {
-			$this->generator->log_failure( $order, $exception );
-
-			$notice = 'idta-pdf-failed';
-		}
-
-		// Return to wherever the button was clicked from — the orders list or
-		// the order edit screen — rather than assuming one or the other.
-		$redirect = wp_get_referer();
-
-		if ( ! is_string( $redirect ) || '' === $redirect ) {
-			$redirect = $order->get_edit_order_url();
-		}
-
-		wp_safe_redirect( add_query_arg( 'idta_pdf_notice', $notice, $redirect ) );
-
-		exit;
-	}
-
-	/**
-	 * Offer regeneration in the order actions dropdown.
-	 *
-	 * @param array<string,string> $actions Existing actions.
-	 *
-	 * @return array<string,string>
-	 */
-	public function add_order_action( $actions ): array {
-		$actions = is_array( $actions ) ? $actions : array();
-
-		$actions['idta_pdf_regenerate'] = __( 'Regenerate IDP documents', 'idta-pdf' );
-
-		return $actions;
-	}
-
-	/**
-	 * Run regeneration from the order actions dropdown.
+	 * Say whether the customer can fetch their permit yet.
 	 *
 	 * @param \WC_Order $order Order object.
 	 */
-	public function handle_order_action( $order ): void {
-		if ( ! $order instanceof \WC_Order ) {
+	private function render_release( \WC_Order $order ): void {
+		if ( $this->releases->is_released( $order ) ) {
+			printf(
+				'<p style="margin:0 0 10px;"><span style="color:#00622b;font-weight:600;">%1$s</span><br><small>%2$s</small></p>',
+				esc_html__( 'Released to the customer', 'idta-pdf' ),
+				esc_html(
+					$this->releases->is_rush( $order )
+						? __( 'Rush order.', 'idta-pdf' )
+						: __( 'Standard order.', 'idta-pdf' )
+				)
+			);
+
 			return;
 		}
 
-		try {
-			$this->generator->generate( $order, true );
-		} catch ( \Throwable $exception ) {
-			$this->generator->log_failure( $order, $exception );
-		}
+		$when = $this->releases->released_at_local( $order );
+
+		printf(
+			'<p style="margin:0 0 10px;"><span style="color:#8a5700;font-weight:600;">%1$s</span><br><small>%2$s</small></p>',
+			esc_html__( 'Not yet released to the customer', 'idta-pdf' ),
+			esc_html(
+				'' !== $when
+					/* translators: %s: a date and time. */
+					? sprintf( __( 'Available to them from %s. Your links above work now.', 'idta-pdf' ), $when )
+					: __( 'The order is not paid, so there is nothing to time the wait from. Your links above work now.', 'idta-pdf' )
+			)
+		);
 	}
 
 	/**
-	 * Resolve an order from whatever the order screen passes in.
+	 * Resolve the order from whatever the screen passed.
 	 *
-	 * The legacy screen passes a WP_Post; HPOS passes a WC_Order.
-	 *
-	 * @param mixed $post Post or order object.
+	 * @param \WP_Post|\WC_Order|null $post Post or order.
 	 *
 	 * @return \WC_Order|null
 	 */

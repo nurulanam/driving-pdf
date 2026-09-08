@@ -22,6 +22,13 @@ final class Generator {
 	public const DOCUMENTS_META = '_idta_pdf_documents';
 
 	/**
+	 * Legacy note: DOCUMENTS_META above recorded where each document was stored
+	 * back when documents were rendered ahead of time and kept in the uploads
+	 * folder. Nothing writes it now — it is read once, by the upgrade routine
+	 * that deletes those files. See Plugin::discard_stored_documents().
+	 */
+
+	/**
 	 * Meta key holding the last failure message.
 	 */
 	public const ERROR_META = '_idta_pdf_last_error';
@@ -90,7 +97,16 @@ final class Generator {
 	}
 
 	/**
-	 * Storage helper accessor.
+	 * Settings accessor.
+	 *
+	 * @return Settings
+	 */
+	public function settings(): Settings {
+		return $this->settings;
+	}
+
+	/**
+	 * Storage helper, used for the remote-asset cache.
 	 *
 	 * @return Filesystem
 	 */
@@ -191,346 +207,195 @@ final class Generator {
 	}
 
 	/**
-	 * Generate every enabled document for an order.
+	 * Slugs an order may be offered, in the order the screens list them.
+	 *
+	 * The documents the order asks for, plus the card's bitmap face when that
+	 * export is switched on and this order has a card to make one from.
 	 *
 	 * @param \WC_Order $order Order object.
-	 * @param bool      $force Rebuild documents that already exist.
 	 *
-	 * @return array<string,string> Absolute paths, keyed by document slug.
-	 *
-	 * @throws Render_Exception When no document could be produced.
+	 * @return string[]
 	 */
-	public function generate( \WC_Order $order, bool $force = false ): array {
+	public function offered_slugs( \WC_Order $order ): array {
+		$slugs = array_keys( $this->documents_for( $order ) );
+
+		if ( in_array( 'card', $slugs, true ) && $this->settings->card_bitmaps() && Card_Bitmap::is_available() ) {
+			foreach ( array_keys( Card_Bitmap::faces() ) as $face ) {
+				$slugs[] = $face;
+			}
+		}
+
+		return $slugs;
+	}
+
+	/**
+	 * Whether an order may be offered a given slug.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param string    $slug  Document slug.
+	 *
+	 * @return bool
+	 */
+	public function offers( \WC_Order $order, string $slug ): bool {
+		return in_array( $slug, $this->offered_slugs( $order ), true );
+	}
+
+	/**
+	 * Render a document and return its bytes.
+	 *
+	 * Nothing is written to the uploads folder: a document exists for the length
+	 * of the request that asked for it. That costs a render on every download,
+	 * which the booklet in particular is not cheap at — hence raise_limits()
+	 * below — but it means no order's documents can be stale, orphaned, or left
+	 * sitting on disk after the permit is delivered.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param string    $slug  Document slug.
+	 *
+	 * @return string
+	 *
+	 * @throws Render_Exception When the order does not offer this document, or
+	 *                          rendering fails.
+	 */
+	public function render_bytes( \WC_Order $order, string $slug ): string {
 		if ( ! Order_Data::has_data( $order ) ) {
 			throw new Render_Exception(
 				sprintf( 'Order %d carries no IDP meta.', $order->get_id() )
 			);
 		}
 
-		$existing = $this->generated_documents( $order );
-		$results  = array();
-		$failures = array();
-
-		foreach ( $this->documents_for( $order ) as $slug => $document ) {
-			if ( ! $force && isset( $existing[ $slug ] ) && is_readable( $existing[ $slug ] ) ) {
-				$results[ $slug ] = $existing[ $slug ];
-
-				continue;
-			}
-
-			try {
-				$results[ $slug ] = $this->render_to_disk( $order, $document );
-			} catch ( \Throwable $exception ) {
-				// One failing document must not discard the other.
-				$failures[ $slug ] = $exception->getMessage();
-
-				$this->log(
-					sprintf(
-						'Order %d: %s document failed - %s',
-						$order->get_id(),
-						$slug,
-						$exception->getMessage()
-					)
-				);
-			}
-		}
-
-		$results = $this->with_card_bitmaps( $order, $results );
-
-		$this->store_documents( $order, $results );
-
-		if ( array() === $results ) {
+		if ( ! $this->offers( $order, $slug ) ) {
 			throw new Render_Exception(
-				sprintf(
-					'No documents could be generated for order %d. %s',
-					$order->get_id(),
-					implode( ' ', $failures )
-				)
+				sprintf( 'Order %d does not offer the "%s" document.', $order->get_id(), $slug )
 			);
 		}
 
-		if ( array() !== $failures ) {
-			$order->update_meta_data( self::ERROR_META, implode( ' | ', $failures ) );
-			$order->save_meta_data();
-		} else {
-			$order->delete_meta_data( self::ERROR_META );
-			$order->save_meta_data();
+		$this->raise_limits();
+
+		// A bitmap face is a render of the card, so the card is rendered first
+		// and converted; there is no second layout to keep in step.
+		if ( Card_Bitmap::is_face( $slug ) ) {
+			return ( new Card_Bitmap() )->bytes( $this->render_pdf( $order, 'card' ), $slug );
 		}
 
-		$order->add_order_note(
-			sprintf(
-				/* translators: %s: comma-separated document names. */
-				__( 'IDTA PDF generated: %s', 'idta-pdf' ),
-				implode( ', ', array_keys( $results ) )
-			)
-		);
-
-		/**
-		 * Fires after an order's documents have been generated.
-		 *
-		 * @param array<string,string> $results Paths keyed by document slug.
-		 * @param \WC_Order            $order   Order object.
-		 */
-		do_action( 'idta_pdf_generated', $results, $order );
-
-		$this->filesystem->purge_cache();
-
-		return $results;
+		return $this->render_pdf( $order, $slug );
 	}
 
 	/**
-	 * Generate a single document for an order.
-	 *
-	 * Used by the manual "Generate" action on the orders list and order edit
-	 * screen, where an operator wants just the missing document rather than
-	 * rebuilding everything.
-	 *
-	 * @param \WC_Order $order Order object.
-	 * @param string    $slug  Document slug.
-	 * @param bool      $force Rebuild even if the document already exists.
-	 *
-	 * @return string Absolute path to the stored PDF.
-	 *
-	 * @throws Render_Exception When the order does not request this document,
-	 *                          or rendering fails.
-	 */
-	public function generate_one( \WC_Order $order, string $slug, bool $force = false ): string {
-		$documents = $this->documents_for( $order );
-
-		if ( ! isset( $documents[ $slug ] ) ) {
-			throw new Render_Exception(
-				sprintf( 'Order %d does not request the "%s" document.', $order->get_id(), $slug )
-			);
-		}
-
-		$existing = $this->generated_documents( $order );
-
-		if ( ! $force && isset( $existing[ $slug ] ) && is_readable( $existing[ $slug ] ) ) {
-			return $existing[ $slug ];
-		}
-
-		$path = $this->render_to_disk( $order, $documents[ $slug ] );
-
-		$existing[ $slug ] = $path;
-
-		$existing = $this->with_card_bitmaps( $order, $existing );
-
-		$this->store_documents( $order, $existing );
-
-		$order->delete_meta_data( self::ERROR_META );
-		$order->save_meta_data();
-
-		$order->add_order_note(
-			sprintf(
-				/* translators: %s: document slug. */
-				__( 'IDTA PDF generated: %s', 'idta-pdf' ),
-				$slug
-			)
-		);
-
-		/** This action is documented in includes/class-generator.php */
-		do_action( 'idta_pdf_generated', array( $slug => $path ), $order );
-
-		$this->filesystem->purge_cache();
-
-		return $path;
-	}
-
-	/**
-	 * Render one document and write it to protected storage.
-	 *
-	 * @param \WC_Order $order    Order object.
-	 * @param Document  $document Document to render.
-	 *
-	 * @return string Absolute path to the stored PDF.
-	 *
-	 * @throws Render_Exception When rendering or storing fails.
-	 */
-	private function render_to_disk( \WC_Order $order, Document $document ): string {
-		$bytes = $this->renderer->render( $document );
-
-		$dir = $this->filesystem->order_dir( $order );
-
-		if ( ! $this->filesystem->ensure_dir( $dir ) ) {
-			throw new Render_Exception(
-				sprintf( 'Document directory "%s" is not writable.', $dir )
-			);
-		}
-
-		$path = trailingslashit( $dir ) . $document->filename();
-
-		if ( ! $this->filesystem->put_contents( $path, $bytes ) ) {
-			throw new Render_Exception(
-				sprintf( 'Could not write "%s".', $path )
-			);
-		}
-
-		if ( $this->settings->debug_html() ) {
-			$this->filesystem->put_contents(
-				preg_replace( '/\.pdf$/', '.html', $path ) ?? $path . '.html',
-				$document->html()
-			);
-		}
-
-		return $path;
-	}
-
-	/**
-	 * Render a document straight to the browser.
+	 * Render one of the PDF documents.
 	 *
 	 * @param \WC_Order $order Order object.
 	 * @param string    $slug  Document slug.
 	 *
-	 * @return string Raw PDF bytes.
+	 * @return string
 	 *
-	 * @throws Render_Exception When the slug is unknown or rendering fails.
+	 * @throws Render_Exception When the document is unknown.
 	 */
-	public function render_bytes( \WC_Order $order, string $slug ): string {
+	private function render_pdf( \WC_Order $order, string $slug ): string {
 		$documents = $this->documents_for( $order );
 
 		if ( ! isset( $documents[ $slug ] ) ) {
-			throw new Render_Exception(
-				sprintf( 'Unknown document "%s".', $slug )
-			);
+			throw new Render_Exception( sprintf( 'Unknown document "%s".', $slug ) );
 		}
 
 		return $this->renderer->render( $documents[ $slug ] );
 	}
 
 	/**
-	 * Stored document paths for an order.
+	 * Render a document's HTML rather than its PDF.
+	 *
+	 * The layout as the engine receives it, for working out why a page broke.
+	 * Reachable only by an authenticated operator, and only while the debug
+	 * setting is on — see Download_Handler.
 	 *
 	 * @param \WC_Order $order Order object.
+	 * @param string    $slug  Document slug.
 	 *
-	 * @return array<string,string> Readable paths, keyed by document slug.
+	 * @return string
+	 *
+	 * @throws Render_Exception When the document is unknown.
 	 */
-	public function generated_documents( \WC_Order $order ): array {
-		$stored = $order->get_meta( self::DOCUMENTS_META, true );
+	public function render_html( \WC_Order $order, string $slug ): string {
+		$documents = $this->documents_for( $order );
 
-		if ( ! is_array( $stored ) ) {
-			return array();
+		// A bitmap face has no HTML of its own; it is a render of the card.
+		if ( Card_Bitmap::is_face( $slug ) ) {
+			$slug = 'card';
 		}
 
-		$documents = array();
-
-		foreach ( $stored as $slug => $path ) {
-			if ( ! is_string( $slug ) || ! is_string( $path ) || '' === $path ) {
-				continue;
-			}
-
-			// Reject anything outside the plugin's own storage.
-			if ( ! $this->filesystem->is_managed( $path ) || ! is_readable( $path ) ) {
-				continue;
-			}
-
-			$documents[ $slug ] = $path;
+		if ( ! isset( $documents[ $slug ] ) ) {
+			throw new Render_Exception( sprintf( 'Unknown document "%s".', $slug ) );
 		}
 
-		return $documents;
+		$this->raise_limits();
+
+		return $documents[ $slug ]->html();
 	}
 
 	/**
-	 * Whether every enabled document already exists for an order.
+	 * Filename a document is delivered under.
 	 *
 	 * @param \WC_Order $order Order object.
+	 * @param string    $slug  Document slug.
 	 *
-	 * @return bool
+	 * @return string
 	 */
-	public function is_generated( \WC_Order $order ): bool {
-		$existing = $this->generated_documents( $order );
-		$expected = array_keys( $this->documents_for( $order ) );
-
-		if ( array() === $expected ) {
-			return false;
+	public function filename( \WC_Order $order, string $slug ): string {
+		if ( Card_Bitmap::is_face( $slug ) ) {
+			return Card_Bitmap::filename( $order, $slug );
 		}
 
-		// Compare against what this order actually asks for, not every enabled
-		// document, or a card-only order would be queued forever.
-		foreach ( $expected as $slug ) {
-			if ( ! isset( $existing[ $slug ] ) ) {
-				return false;
-			}
-		}
+		$documents = $this->documents_for( $order );
 
-		return true;
+		return isset( $documents[ $slug ] )
+			? $documents[ $slug ]->filename()
+			: sprintf( '%s-%s.pdf', $slug, $order->get_order_number() );
 	}
 
 	/**
-	 * Delete an order's documents.
+	 * Media type a document is served as.
 	 *
-	 * @param \WC_Order $order Order object.
+	 * @param string $slug Document slug.
+	 *
+	 * @return string
 	 */
-	public function delete( \WC_Order $order ): void {
-		foreach ( $this->generated_documents( $order ) as $path ) {
-			$this->filesystem->delete( $path );
-		}
-
-		$order->delete_meta_data( self::DOCUMENTS_META );
-		$order->save_meta_data();
+	public function mime( string $slug ): string {
+		return Card_Bitmap::is_face( $slug ) ? 'image/bmp' : 'application/pdf';
 	}
 
 	/**
-	 * Add the card's bitmap faces to a result map, when they are wanted.
+	 * Give the request the headroom a document needs.
 	 *
-	 * The bitmaps are renders of the card PDF rather than a second layout, so
-	 * they cannot drift from it, and mPDF's text shaping — which the front's
-	 * Arabic and Hebrew line depends on — is already baked into the page by the
-	 * time it is rasterised.
-	 *
-	 * A failure here is not a failure of the order: the card PDF is already
-	 * rendered and is what most sites print. The faces are simply left out and
-	 * the reason logged.
-	 *
-	 * @param \WC_Order            $order   Order object.
-	 * @param array<string,string> $results Paths keyed by document slug.
-	 *
-	 * @return array<string,string>
+	 * The booklet embeds a portrait, seals and branding, and mPDF holds the
+	 * whole document in memory while it lays it out. The defaults on shared
+	 * hosting are not generous enough to make that survive, and it fails in a
+	 * way that looks like the plugin rather than the limit.
 	 */
-	private function with_card_bitmaps( \WC_Order $order, array $results ): array {
-		if ( ! isset( $results['card'] ) || ! $this->settings->card_bitmaps() ) {
-			return $results;
-		}
-
-		$faces = ( new Card_Bitmap( $this->filesystem ) )->render( $order, $results['card'] );
-
-		if ( array() === $faces ) {
-			$this->log(
-				sprintf(
-					'Order %d: card bitmaps were requested but no PDF rasteriser (Imagick, Ghostscript or pdftoppm) could be used.',
-					$order->get_id()
-				)
-			);
-
-			return $results;
-		}
-
-		/*
-		 * Any face this version no longer produces is dropped from the map, so
-		 * a back face generated by an earlier version stops being listed the
-		 * next time the order is generated. Card_Bitmap deletes the file.
+	private function raise_limits(): void {
+		/**
+		 * Filters the memory limit raised for a render.
+		 *
+		 * @param string $limit Memory limit. Empty leaves it untouched.
 		 */
-		foreach ( array_keys( $results ) as $slug ) {
-			if ( str_ends_with( $slug, '-bmp' ) && ! isset( $faces[ $slug ] ) ) {
-				unset( $results[ $slug ] );
-			}
+		$memory = (string) apply_filters( 'idta_pdf_memory_limit', '512M' );
+
+		if ( '' !== $memory ) {
+			wp_raise_memory_limit( 'image' );
+
+			// Fails silently where it is fixed, which is the intended outcome.
+			@ini_set( 'memory_limit', $memory ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.PHP.IniSet.Risky
 		}
 
-		return array_merge( $results, $faces );
-	}
+		/**
+		 * Filters the time limit raised for a render.
+		 *
+		 * @param int $seconds Time limit. Zero leaves the limit untouched.
+		 */
+		$seconds = (int) apply_filters( 'idta_pdf_time_limit', 300 );
 
-	/**
-	 * Persist the generated document map on the order.
-	 *
-	 * @param \WC_Order            $order   Order object.
-	 * @param array<string,string> $results Paths keyed by document slug.
-	 */
-	private function store_documents( \WC_Order $order, array $results ): void {
-		if ( array() === $results ) {
-			return;
+		if ( $seconds > 0 && function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( $seconds ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		}
-
-		$order->update_meta_data( self::DOCUMENTS_META, $results );
-		$order->save_meta_data();
 	}
 
 	/**

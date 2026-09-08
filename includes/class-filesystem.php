@@ -13,6 +13,11 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Owns the plugin's directories under wp-content/uploads.
+ *
+ * No document is kept here. Documents are rendered when their URL is requested
+ * and streamed straight out, so what remains under this directory is working
+ * storage: the cache of customers' uploaded photos, which would otherwise be
+ * fetched over the network on every render, and the engine's own scratch space.
  */
 final class Filesystem {
 
@@ -30,30 +35,6 @@ final class Filesystem {
 		$uploads = wp_get_upload_dir();
 
 		return trailingslashit( $uploads['basedir'] ) . self::DIR_NAME;
-	}
-
-	/**
-	 * Documents directory for a given order.
-	 *
-	 * Documents are namespaced by order ID and a per-order token so that the
-	 * path cannot be guessed from the order number alone.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return string
-	 */
-	public function order_dir( \WC_Order $order ): string {
-		$dir = sprintf(
-			'%s/documents/%s/%d-%s',
-			$this->base_dir(),
-			gmdate( 'Y/m', $this->order_timestamp( $order ) ),
-			$order->get_id(),
-			$this->order_token( $order )
-		);
-
-		$this->ensure_dir( $dir );
-
-		return $dir;
 	}
 
 	/**
@@ -80,28 +61,6 @@ final class Filesystem {
 		$this->ensure_dir( $dir );
 
 		return $dir;
-	}
-
-	/**
-	 * Stable per-order token, generated once and stored on the order.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return string
-	 */
-	public function order_token( \WC_Order $order ): string {
-		$token = $order->get_meta( '_idta_pdf_token', true );
-
-		if ( is_string( $token ) && 1 === preg_match( '/^[a-f0-9]{16}$/', $token ) ) {
-			return $token;
-		}
-
-		$token = substr( bin2hex( random_bytes( 8 ) ), 0, 16 );
-
-		$order->update_meta_data( '_idta_pdf_token', $token );
-		$order->save_meta_data();
-
-		return $token;
 	}
 
 	/**
@@ -272,45 +231,5 @@ final class Filesystem {
 		}
 
 		return ( $absolute ? '/' : '' ) . implode( '/', $out );
-	}
-
-	/**
-	 * Remove cached assets older than a day.
-	 */
-	public function purge_cache(): void {
-		$dir = $this->cache_dir();
-
-		$files = glob( $dir . '/*' );
-
-		if ( ! is_array( $files ) ) {
-			return;
-		}
-
-		$cutoff = time() - DAY_IN_SECONDS;
-
-		foreach ( $files as $file ) {
-			if ( ! is_file( $file ) || str_ends_with( $file, '.htaccess' ) || str_ends_with( $file, 'index.php' ) ) {
-				continue;
-			}
-
-			$modified = filemtime( $file );
-
-			if ( false !== $modified && $modified < $cutoff ) {
-				wp_delete_file( $file );
-			}
-		}
-	}
-
-	/**
-	 * Order creation timestamp, falling back to now.
-	 *
-	 * @param \WC_Order $order Order object.
-	 *
-	 * @return int
-	 */
-	private function order_timestamp( \WC_Order $order ): int {
-		$created = $order->get_date_created();
-
-		return $created instanceof \WC_DateTime ? $created->getTimestamp() : time();
 	}
 }

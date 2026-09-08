@@ -51,15 +51,8 @@ final class Settings {
 			'custom_css'       => '',
 			'booklet_css'      => '',
 			'card_css'         => '',
-			'trigger_statuses' => array( 'pending', 'processing', 'completed' ),
+			'trigger_statuses' => array( 'processing', 'completed' ),
 			'documents'        => array( 'booklet', 'card', 'print-copy' ),
-			/**
-			 * Email attachments are off by default: the booklet embeds every
-			 * scanned page at full resolution and routinely exceeds 10 MB,
-			 * which most mail servers reject. Prefer the download link, and
-			 * enable this only for the card or with lighter artwork.
-			 */
-			'attach_to_emails' => array(),
 			// Empty by default: qr_base_url() falls back to the current
 			// site's home_url() so QR links work out of the box.
 			'qr_base_url'      => '',
@@ -173,12 +166,6 @@ final class Settings {
 			array_intersect( self::DOCUMENTS, array_map( 'sanitize_key', $documents ) )
 		);
 
-		$emails = (array) ( $input['attach_to_emails'] ?? array() );
-
-		$clean['attach_to_emails'] = array_values(
-			array_filter( array_map( 'sanitize_key', $emails ) )
-		);
-
 		$clean['qr_base_url']       = esc_url_raw( (string) ( $input['qr_base_url'] ?? $defaults['qr_base_url'] ) );
 		$clean['qr_permit_secret']  = sanitize_text_field( (string) ( $input['qr_permit_secret'] ?? '' ) );
 		$clean['qr_details_secret'] = sanitize_text_field( (string) ( $input['qr_details_secret'] ?? '' ) );
@@ -289,16 +276,21 @@ final class Settings {
 	}
 
 	/**
-	 * Order statuses that trigger generation.
+	 * Order statuses whose documents may be downloaded.
+	 *
+	 * Nothing is generated ahead of time any more, so this no longer decides
+	 * when a document is built — it decides which orders are allowed to fetch
+	 * one. The stored key keeps its original name so existing configuration
+	 * carries over untouched.
 	 *
 	 * @return string[]
 	 */
-	public function trigger_statuses(): array {
+	public function release_statuses(): array {
 		$statuses = (array) $this->get( 'trigger_statuses', array( 'processing', 'completed' ) );
 
 		$statuses = array_values( array_filter( array_map( 'strval', $statuses ) ) );
 
-		return array() !== $statuses ? $statuses : array( 'processing' );
+		return array() !== $statuses ? $statuses : array( 'processing', 'completed' );
 	}
 
 	/**
@@ -345,15 +337,6 @@ final class Settings {
 		);
 
 		return array() !== $documents ? $documents : self::DOCUMENTS;
-	}
-
-	/**
-	 * Email IDs that receive the PDFs as attachments.
-	 *
-	 * @return string[]
-	 */
-	public function attachment_emails(): array {
-		return array_values( array_filter( array_map( 'strval', (array) $this->get( 'attach_to_emails', array() ) ) ) );
 	}
 
 	/**

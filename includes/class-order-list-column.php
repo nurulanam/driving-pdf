@@ -12,10 +12,12 @@ namespace IDTA\PDF;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Adds a trailing "PDFs" column with per-document download or generate buttons,
- * a regenerate action, and the last generation error when there is one — on both
- * the legacy post-based orders screen and the High-Performance Order Storage
- * orders screen.
+ * Adds a trailing "PDFs" column of per-document links, plus the last render
+ * error when there is one — on both the legacy post-based orders screen and the
+ * High-Performance Order Storage orders screen.
+ *
+ * Every link renders its document when it is followed, so there is nothing to
+ * generate from here and no stored copy to be out of date.
  */
 final class Order_List_Column {
 
@@ -32,13 +34,6 @@ final class Order_List_Column {
 	private Generator $generator;
 
 	/**
-	 * Order admin, reused for its download and generate URL builders.
-	 *
-	 * @var Order_Admin
-	 */
-	private Order_Admin $order_admin;
-
-	/**
 	 * Download URL builder.
 	 *
 	 * @var Download_Handler
@@ -46,15 +41,23 @@ final class Order_List_Column {
 	private Download_Handler $downloads;
 
 	/**
+	 * Release rules.
+	 *
+	 * @var Release_Schedule
+	 */
+	private Release_Schedule $releases;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param Generator   $generator   Document generator.
-	 * @param Order_Admin $order_admin Order admin.
+	 * @param Generator        $generator Document generator.
+	 * @param Download_Handler $downloads Download URL builder.
+	 * @param Release_Schedule $releases  Release rules.
 	 */
-	public function __construct( Generator $generator, Order_Admin $order_admin ) {
-		$this->generator   = $generator;
-		$this->order_admin = $order_admin;
-		$this->downloads   = new Download_Handler( $generator );
+	public function __construct( Generator $generator, Download_Handler $downloads, Release_Schedule $releases ) {
+		$this->generator = $generator;
+		$this->downloads = $downloads;
+		$this->releases  = $releases;
 	}
 
 	/**
@@ -120,7 +123,7 @@ final class Order_List_Column {
 	}
 
 	/**
-	 * Render the buttons for one order.
+	 * Render the column for one order.
 	 *
 	 * @param \WC_Order $order Order object.
 	 */
@@ -131,91 +134,76 @@ final class Order_List_Column {
 			return;
 		}
 
-		$requested = array_keys( $this->generator->documents_for( $order ) );
+		$slugs = $this->generator->offered_slugs( $order );
 
-		if ( array() === $requested ) {
+		if ( array() === $slugs ) {
 			echo '&#8212;';
 
 			return;
 		}
 
-		$documents = $this->generator->generated_documents( $order );
-
 		$labels = array(
 			'booklet'    => __( 'Permit', 'idta-pdf' ),
 			'card'       => __( 'Card', 'idta-pdf' ),
 			'print-copy' => __( 'Permit print', 'idta-pdf' ),
-			'card-front-bmp' => __( 'Card front (BMP)', 'idta-pdf' ),
-		);
-
-		/*
-		 * The card's bitmap faces are derived from the card PDF rather than
-		 * requested in their own right, so documents_for() does not name them.
-		 * Appending whatever else is on disk lists them for download without
-		 * offering a "Generate" button that no document class could answer.
-		 */
-		$listed = array_merge(
-			$requested,
-			array_values( array_diff( array_keys( $documents ), $requested ) )
+			Card_Bitmap::FRONT_SLUG => __( 'Card front (BMP)', 'idta-pdf' ),
 		);
 
 		// One row, wrapping only if the column is too narrow for it.
 		echo '<div class="idta-pdf-column" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">';
 
-		foreach ( $listed as $slug ) {
-			$label = $labels[ $slug ] ?? $slug;
-
-			if ( isset( $documents[ $slug ] ) ) {
-				printf(
-					'<a class="button button-small" href="%1$s">%2$s</a>',
-					esc_url( $this->downloads->admin_url( $order, $slug ) ),
-					esc_html( $label )
-				);
-
-				continue;
-			}
-
+		foreach ( $slugs as $slug ) {
 			printf(
-				'<a class="button button-small button-secondary" href="%1$s">%2$s</a>',
-				esc_url( $this->order_admin->generate_one_url( $order, $slug ) ),
-				/* translators: %s: document label, e.g. "Permit" or "Card". */
-				esc_html( sprintf( __( 'Generate %s', 'idta-pdf' ), $label ) )
+				'<a class="button button-small" href="%1$s" target="_blank" rel="noopener">%2$s</a>',
+				esc_url( $this->downloads->admin_url( $order, $slug ) ),
+				esc_html( $labels[ $slug ] ?? $slug )
 			);
 		}
 
-		$this->render_regenerate( $order );
+		$this->render_release( $order );
 		$this->render_error( $order );
 
 		echo '</div>';
 	}
 
 	/**
-	 * Icon-only regenerate button.
+	 * A marker showing whether the customer can fetch their permit yet.
 	 *
-	 * Dashicons are always present in wp-admin, so no asset needs enqueueing. The
-	 * label lives in the title and aria-label rather than as text, since the
-	 * column has room for the two document buttons and little else.
+	 * Icon-only, with the detail in the title: the column has room for the
+	 * document buttons and little else. Dashicons are always present in
+	 * wp-admin, so nothing needs enqueueing.
 	 *
 	 * @param \WC_Order $order Order object.
 	 */
-	private function render_regenerate( \WC_Order $order ): void {
+	private function render_release( \WC_Order $order ): void {
+		if ( $this->releases->is_released( $order ) ) {
+			printf(
+				'<span class="dashicons dashicons-yes-alt" style="color:#00622b;" title="%s"></span>',
+				esc_attr__( 'Released: the customer can download this now.', 'idta-pdf' )
+			);
+
+			return;
+		}
+
+		$when = $this->releases->released_at_local( $order );
+
 		printf(
-			'<a class="button button-small" href="%1$s" title="%2$s" aria-label="%2$s"'
-			. ' style="padding:0 5px;line-height:24px;">'
-			. '<span class="dashicons dashicons-update" style="font-size:16px;width:16px;height:16px;'
-			. 'line-height:24px;vertical-align:top;"></span></a>',
-			esc_url( $this->order_admin->regenerate_url( $order ) ),
-			esc_attr__( 'Regenerate PDFs', 'idta-pdf' )
+			'<span class="dashicons dashicons-clock" style="color:#8a5700;" title="%s"></span>',
+			esc_attr(
+				'' !== $when
+					/* translators: %s: a date and time. */
+					? sprintf( __( 'Held back from the customer until %s.', 'idta-pdf' ), $when )
+					: __( 'Held back: the order is not paid.', 'idta-pdf' )
+			)
 		);
 	}
 
 	/**
-	 * Warning icon carrying the last generation error, when one was recorded.
+	 * Warning icon carrying the last render error, when one was recorded.
 	 *
-	 * Generator::generate() keeps going when a single document fails, so an order
-	 * can legitimately end up with one PDF and not the other. Without this the
-	 * only clue was the panel on the order screen, which is a click away from
-	 * where the missing button is noticed.
+	 * A render now fails in front of whoever asked for it, so this is the record
+	 * of the last one that did — usually a customer's link that answered with an
+	 * error while the operator heard nothing about it.
 	 *
 	 * @param \WC_Order $order Order object.
 	 */

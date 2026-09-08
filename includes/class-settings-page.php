@@ -104,7 +104,7 @@ final class Settings_Page {
 	private function tabs(): array {
 		return array(
 			'documents' => __( 'Documents', 'idta-pdf' ),
-			'timing'    => __( 'Timing', 'idta-pdf' ),
+			'timing'    => __( 'Release', 'idta-pdf' ),
 			'delivery'  => __( 'Delivery', 'idta-pdf' ),
 			'uploads'   => __( 'Uploads', 'idta-pdf' ),
 			'styling'   => __( 'Styling', 'idta-pdf' ),
@@ -160,11 +160,6 @@ final class Settings_Page {
 			),
 		);
 
-		$emails = array(
-			'customer_processing_order' => __( 'Processing order', 'idta-pdf' ),
-			'customer_completed_order'  => __( 'Completed order', 'idta-pdf' ),
-			'customer_invoice'          => __( 'Invoice', 'idta-pdf' ),
-		);
 		?>
 		<div class="wrap idta-settings">
 			<h1><?php esc_html_e( 'IDTA PDF', 'idta-pdf' ); ?></h1>
@@ -265,7 +260,7 @@ final class Settings_Page {
 					<div class="idta-card">
 						<h2><?php esc_html_e( 'Documents to generate', 'idta-pdf' ); ?></h2>
 						<p class="idta-card__intro">
-							<?php esc_html_e( 'An order still only receives what it asks for: an order for a card alone never produces a booklet, whatever is ticked here.', 'idta-pdf' ); ?>
+							<?php esc_html_e( 'Which documents an order can be offered. An order still only receives what it asks for: an order for a card alone never offers a booklet, whatever is ticked here. Each one is rendered when its link is opened — none are stored on the server.', 'idta-pdf' ); ?>
 						</p>
 						<table class="form-table" role="presentation">
 							<tr>
@@ -356,8 +351,8 @@ final class Settings_Page {
 											value="1"
 											<?php checked( ! empty( $values['debug_html'] ) ); ?>
 										>
-										<span><?php esc_html_e( 'Save the rendered HTML next to each PDF', 'idta-pdf' ); ?></span>
-										<span class="idta-choice__hint"><?php esc_html_e( 'For debugging a layout. Leave off in normal use.', 'idta-pdf' ); ?></span>
+										<span><?php esc_html_e( 'Allow the rendered HTML to be viewed instead of the PDF', 'idta-pdf' ); ?></span>
+										<span class="idta-choice__hint"><?php esc_html_e( 'Add &html=1 to one of your own document links to see the markup the engine was given. For debugging a layout; leave off in normal use.', 'idta-pdf' ); ?></span>
 									</label>
 								</td>
 							</tr>
@@ -368,9 +363,9 @@ final class Settings_Page {
 				<!-- Timing -->
 				<div class="idta-pane<?php echo 'timing' === $active ? ' is-active' : ''; ?>" data-pane="timing">
 					<div class="idta-card">
-						<h2><?php esc_html_e( 'When to generate', 'idta-pdf' ); ?></h2>
+						<h2><?php esc_html_e( 'Who may download', 'idta-pdf' ); ?></h2>
 						<p class="idta-card__intro">
-							<?php esc_html_e( 'Documents are queued when an order reaches one of these statuses, then built after the wait set below.', 'idta-pdf' ); ?>
+							<?php esc_html_e( 'Nothing is generated in advance and nothing is stored: a document is produced when its link is opened. These rules decide when the customer\'s link starts working — your own links on the order screens always work immediately.', 'idta-pdf' ); ?>
 						</p>
 						<table class="form-table" role="presentation">
 							<tr>
@@ -389,7 +384,7 @@ final class Settings_Page {
 										</label>
 									<?php endforeach; ?>
 									<p class="description" style="margin-top:8px;">
-										<?php esc_html_e( 'Include "pending" to queue new orders before payment.', 'idta-pdf' ); ?>
+										<?php esc_html_e( 'A customer may download only while their order holds one of these statuses. An unpaid order is never released, whatever is ticked, because the wait is measured from payment.', 'idta-pdf' ); ?>
 									</p>
 								</td>
 							</tr>
@@ -397,9 +392,9 @@ final class Settings_Page {
 					</div>
 
 					<div class="idta-card">
-						<h2><?php esc_html_e( 'How long to wait', 'idta-pdf' ); ?></h2>
+						<h2><?php esc_html_e( 'How long the customer waits', 'idta-pdf' ); ?></h2>
 						<p class="idta-card__intro">
-							<?php esc_html_e( 'Measured from payment, so the wait is the same whether the customer paid at checkout or followed a pay link days later. An order with no payment recorded is timed from when it reached one of the statuses above.', 'idta-pdf' ); ?>
+							<?php esc_html_e( 'Measured from payment, so the wait is the same whether the customer paid at checkout or followed a pay link days later. An order marked paid by hand, with no payment time recorded, is timed from when it was placed.', 'idta-pdf' ); ?>
 						</p>
 						<table class="form-table" role="presentation">
 							<tr>
@@ -446,7 +441,7 @@ final class Settings_Page {
 										</label>
 									</div>
 									<p class="description" style="margin-top:10px;">
-										<?php esc_html_e( 'Zero generates immediately. The admin "Generate" and "Regenerate" buttons always run at once and ignore these.', 'idta-pdf' ); ?>
+										<?php esc_html_e( 'Zero releases as soon as the order is paid.', 'idta-pdf' ); ?>
 									</p>
 								</td>
 							</tr>
@@ -456,39 +451,6 @@ final class Settings_Page {
 
 				<!-- Delivery -->
 				<div class="idta-pane<?php echo 'delivery' === $active ? ' is-active' : ''; ?>" data-pane="delivery">
-					<div class="idta-card">
-						<h2><?php esc_html_e( 'Email attachments', 'idta-pdf' ); ?></h2>
-						<p class="idta-card__intro">
-							<?php esc_html_e( 'Only the booklet and the card are ever attached — the permit print and the card bitmap are production files and stay on the admin screens.', 'idta-pdf' ); ?>
-						</p>
-						<table class="form-table" role="presentation">
-							<tr>
-								<th scope="row"><?php esc_html_e( 'Attach to', 'idta-pdf' ); ?></th>
-								<td>
-									<?php foreach ( $emails as $key => $label ) : ?>
-										<label class="idta-choice">
-											<input
-												type="checkbox"
-												name="idta_pdf[attach_to_emails][]"
-												value="<?php echo esc_attr( $key ); ?>"
-												<?php checked( in_array( $key, (array) $values['attach_to_emails'], true ) ); ?>
-											>
-											<span><?php echo esc_html( $label ); ?></span>
-										</label>
-									<?php endforeach; ?>
-									<p class="description" style="margin-top:8px;">
-										<?php esc_html_e( 'Off by default. The booklet often exceeds 10 MB, which most mail servers reject — the download link is usually the better route.', 'idta-pdf' ); ?>
-									</p>
-									<?php if ( array() !== (array) $values['attach_to_emails'] ) : ?>
-										<p class="description" style="color:#8a5700;">
-											<?php esc_html_e( 'Note: an email that finds no documents yet builds them on the spot, so attaching to an email that goes out at payment cancels the wait set under Timing.', 'idta-pdf' ); ?>
-										</p>
-									<?php endif; ?>
-								</td>
-							</tr>
-						</table>
-					</div>
-
 					<div class="idta-card">
 						<h2><?php esc_html_e( 'Verification links', 'idta-pdf' ); ?></h2>
 						<p class="idta-card__intro">
@@ -848,20 +810,11 @@ final class Settings_Page {
 				: __( 'Needs the Imagick extension, Ghostscript or pdftoppm. The setting stays switched off until one is reachable.', 'idta-pdf' ),
 		);
 
-		/*
-		 * Action Scheduler is what makes a delay land when it is meant to.
-		 * WooCommerce ships it, so its absence means something has gone wrong
-		 * with the install rather than being a host limitation.
-		 */
-		$scheduler = function_exists( 'as_schedule_single_action' );
-
 		$rows[] = array(
-			'label' => __( 'Scheduler', 'idta-pdf' ),
-			'value' => $scheduler ? __( 'Action Scheduler', 'idta-pdf' ) : __( 'WP-Cron', 'idta-pdf' ),
-			'state' => $scheduler ? 'ok' : 'warn',
-			'note'  => $scheduler
-				? __( 'Generation waits are honoured to the minute.', 'idta-pdf' )
-				: __( 'Falling back to WP-Cron, which only runs when the site is visited, so a document may appear later than its wait implies.', 'idta-pdf' ),
+			'label' => __( 'Generation', 'idta-pdf' ),
+			'value' => __( 'On request', 'idta-pdf' ),
+			'state' => 'ok',
+			'note'  => __( 'Each document is rendered when its link is opened and streamed straight to the browser. Nothing is queued, and no copy is kept on the server.', 'idta-pdf' ),
 		);
 
 		$base     = $generator->filesystem()->base_dir();
@@ -874,8 +827,8 @@ final class Settings_Page {
 			'value' => '' !== $base ? $base : __( 'Unavailable', 'idta-pdf' ),
 			'state' => '',
 			'note'  => $writable
-				? __( 'Writable.', 'idta-pdf' )
-				: __( 'Not writable, so generated documents cannot be stored.', 'idta-pdf' ),
+				? __( 'Writable. Documents are never written here — this holds only the cache of customers\' uploaded photos.', 'idta-pdf' )
+				: __( 'Not writable, so customers\' uploaded photos cannot be cached and will be fetched on every render.', 'idta-pdf' ),
 		);
 
 		return $rows;

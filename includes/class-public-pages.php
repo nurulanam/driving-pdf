@@ -60,16 +60,24 @@ final class Public_Pages {
 	private Download_Handler $downloads;
 
 	/**
+	 * Release rules.
+	 *
+	 * @var Release_Schedule
+	 */
+	private Release_Schedule $releases;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Generator $generator Document generator.
 	 * @param Settings  $settings  Settings repository.
 	 */
-	public function __construct( Generator $generator, Settings $settings ) {
+	public function __construct( Generator $generator, Settings $settings, Release_Schedule $releases ) {
 		$this->generator = $generator;
 		$this->settings  = $settings;
 		$this->qr        = new QR_Generator( $settings );
-		$this->downloads = new Download_Handler( $generator );
+		$this->releases  = $releases;
+		$this->downloads = new Download_Handler( $generator, $releases );
 	}
 
 	/**
@@ -278,10 +286,19 @@ final class Public_Pages {
 			return '';
 		}
 
-		// Made available to the template.
+		/*
+		 * Made available to the template. $documents is the list of slugs this
+		 * order may be offered, not stored paths — nothing is stored, and each
+		 * link renders its document when it is followed. It is empty until the
+		 * order's permit is released, which is what keeps the page from offering
+		 * a link that would answer with a refusal.
+		 */
 		$data      = new Order_Data( $order );
-		$documents = $this->generator->generated_documents( $order );
+		$documents = $this->releases->is_released( $order )
+			? $this->generator->offered_slugs( $order )
+			: array();
 		$downloads = $this->downloads;
+		$unavailable = $this->releases->explain( $order );
 
 		unset( $template );
 
