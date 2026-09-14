@@ -27,8 +27,11 @@ final class Release_Email extends \WC_Email {
 
 	/**
 	 * Order meta recording when this email was sent.
+	 *
+	 * An alias. The value is declared on Release_Notifier so that code which
+	 * needs the key does not have to load this class, and with it WC_Email.
 	 */
-	public const SENT_META = '_idta_pdf_permit_email_sent';
+	public const SENT_META = Release_Notifier::SENT_META;
 
 	/**
 	 * Document generator.
@@ -122,10 +125,28 @@ final class Release_Email extends \WC_Email {
 			return false;
 		}
 
+		$content = $this->get_content();
+
+		/*
+		 * Never send an empty message. wc_get_template_html() returns an empty
+		 * string when it cannot find the template — which is what an incomplete
+		 * upload looks like, since updating this plugin by overwriting the
+		 * folder can leave the templates behind — and wp_mail() reports success
+		 * for a blank email just as readily as for a real one. WooCommerce would
+		 * then write "Email sent" on the order while the customer received
+		 * nothing worth reading, which is a far harder fault to trace than a
+		 * send that simply failed.
+		 */
+		if ( '' === trim( $content ) ) {
+			$this->restore_locale();
+
+			return false;
+		}
+
 		$sent = $this->send(
 			$this->get_recipient(),
 			$this->get_subject(),
-			$this->get_content(),
+			$content,
 			$this->get_headers(),
 			$this->get_attachments()
 		);

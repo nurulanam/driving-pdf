@@ -56,6 +56,26 @@ final class Release_Schedule {
 	 * @return bool
 	 */
 	public function is_released( \WC_Order $order ): bool {
+		/*
+		 * Once the customer has been sent their links, the order stays released
+		 * for good. Those links are in an email they keep, and a link that was
+		 * handed out and then stopped working is worse than one that was never
+		 * sent: the customer has no way to tell a withdrawn permit from a broken
+		 * site, and the first they learn of it is at a roadside.
+		 *
+		 * It also makes the state stable. Without this, a later status change, a
+		 * longer wait typed into the settings, or a refund being processed and
+		 * reversed would each silently take the permit back.
+		 *
+		 * A store that does need to withdraw one can still do so through the
+		 * idta_pdf_is_released filter below, which is the right place for a
+		 * decision that deliberate.
+		 */
+		if ( $this->has_been_notified( $order ) ) {
+			/** This filter is documented below. */
+			return (bool) apply_filters( 'idta_pdf_is_released', true, $order );
+		}
+
 		$released_at = $this->released_at( $order );
 
 		$released = 0 !== $released_at
@@ -69,6 +89,17 @@ final class Release_Schedule {
 		 * @param \WC_Order $order    Order object.
 		 */
 		return (bool) apply_filters( 'idta_pdf_is_released', $released, $order );
+	}
+
+	/**
+	 * Whether the customer has been sent their permit links.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return bool
+	 */
+	public function has_been_notified( \WC_Order $order ): bool {
+		return '' !== (string) $order->get_meta( Release_Notifier::SENT_META, true );
 	}
 
 	/**
@@ -208,12 +239,52 @@ final class Release_Schedule {
 		}
 
 		if ( ! $this->status_allows( $order ) ) {
-			return __( 'This permit is not available for download while the order is on hold. Please contact us.', 'idta-pdf' );
+			// Deliberately vague about which status: the customer cannot act on
+			// "on-hold" or "refunded", and the reason may be one the store would
+			// rather explain itself.
+			return __( 'This permit is not available for download at the moment. Please contact us.', 'idta-pdf' );
 		}
 
 		return sprintf(
 			/* translators: %s: a date and time, in the site's own format and timezone. */
 			__( 'This permit is being prepared and can be downloaded from %s.', 'idta-pdf' ),
+			$this->released_at_local( $order )
+		);
+	}
+
+	/**
+	 * Why an order is held back, in the terms an operator needs.
+	 *
+	 * Separate from explain(), which is written for the customer. An operator
+	 * needs to know which of the three conditions is the one failing — and in
+	 * particular needs not to be told "held until 7:03" about a time that passed
+	 * hours ago, which is what a message that only ever reports the wait does
+	 * when the real obstacle is the order's status.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return string Empty when the order is released.
+	 */
+	public function reason( \WC_Order $order ): string {
+		if ( $this->is_released( $order ) ) {
+			return '';
+		}
+
+		if ( 0 === $this->paid_at( $order ) ) {
+			return __( 'Held back: the order is not paid, so there is nothing to time the wait from.', 'idta-pdf' );
+		}
+
+		if ( ! $this->status_allows( $order ) ) {
+			return sprintf(
+				/* translators: %s: an order status, e.g. "completed". */
+				__( 'Held back: documents are not released for the "%s" status. Change it under IDTA PDF → Release.', 'idta-pdf' ),
+				$order->get_status()
+			);
+		}
+
+		return sprintf(
+			/* translators: %s: a date and time. */
+			__( 'Held back from the customer until %s.', 'idta-pdf' ),
 			$this->released_at_local( $order )
 		);
 	}

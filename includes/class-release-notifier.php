@@ -32,6 +32,18 @@ final class Release_Notifier {
 	public const HOOK = 'idta_pdf_send_release_email';
 
 	/**
+	 * Order meta recording when the permit-ready email was sent.
+	 *
+	 * Declared here rather than on Release_Email, which is where it belongs
+	 * conceptually, because Release_Email extends WC_Email: naming a constant on
+	 * it loads the file, and the file cannot be loaded before WooCommerce has
+	 * defined its parent. Release_Schedule reads this key on the front end, long
+	 * before anything has asked WooCommerce for its mailer, so the key has to
+	 * live somewhere with no parent of its own.
+	 */
+	public const SENT_META = '_idta_pdf_permit_email_sent';
+
+	/**
 	 * Order meta counting how many times sending has been attempted.
 	 */
 	public const ATTEMPTS_META = '_idta_pdf_permit_email_attempts';
@@ -47,6 +59,13 @@ final class Release_Notifier {
 	 * @var Release_Schedule
 	 */
 	private Release_Schedule $releases;
+
+	/**
+	 * The Action Scheduler action currently being run, when there is one.
+	 *
+	 * @var int|null
+	 */
+	private ?int $running_action = null;
 
 	/**
 	 * Constructor.
@@ -73,6 +92,15 @@ final class Release_Notifier {
 
 		// Both the Action Scheduler and the WP-Cron signatures.
 		add_action( self::HOOK, array( $this, 'send' ), 10, 1 );
+
+		/*
+		 * Note which action is running, so send() can write what it did into
+		 * that action's own log. Without it the Scheduled Actions screen says
+		 * only that the action completed, which is equally true of an email
+		 * that went out and one that was skipped.
+		 */
+		add_action( 'action_scheduler_before_execute', array( $this, 'note_running_action' ), 10, 1 );
+		add_action( 'action_scheduler_after_execute', array( $this, 'forget_running_action' ), 10, 1 );
 
 		add_filter( 'woocommerce_email_classes', array( $this, 'register_email' ) );
 		add_filter( 'woocommerce_resend_order_emails_available', array( $this, 'offer_resend' ) );
@@ -115,6 +143,54 @@ final class Release_Notifier {
 		$available[] = 'idta_pdf_release';
 
 		return $available;
+	}
+
+	/**
+	 * Remember the action being executed.
+	 *
+	 * Recorded for every action, not only this plugin's: the id is only ever
+	 * read from inside send(), which nothing but this plugin's own action runs.
+	 *
+	 * @param int|string $action_id Action ID.
+	 */
+	public function note_running_action( $action_id ): void {
+		$this->running_action = absint( $action_id );
+	}
+
+	/**
+	 * Forget it again.
+	 *
+	 * @param int|string $action_id Action ID.
+	 */
+	public function forget_running_action( $action_id ): void {
+		unset( $action_id );
+
+		$this->running_action = null;
+	}
+
+	/**
+	 * Write a line into the running action's log.
+	 *
+	 * Shown in the Log column of WooCommerce → Status → Scheduled Actions,
+	 * against the action it belongs to, so each order's outcome can be read
+	 * individually rather than inferred from the batch.
+	 *
+	 * Does nothing when there is no action to attach to — an order whose wait
+	 * had already passed is emailed there and then, without one — and nothing
+	 * when Action Scheduler is not present at all.
+	 *
+	 * @param string $message What happened.
+	 */
+	private function log_action( string $message ): void {
+		if ( null === $this->running_action || 0 === $this->running_action ) {
+			return;
+		}
+
+		if ( ! class_exists( '\ActionScheduler' ) ) {
+			return;
+		}
+
+		\ActionScheduler::logger()->log( $this->running_action, $message );
 	}
 
 	/**
@@ -191,7 +267,22 @@ final class Release_Notifier {
 
 		$order = wc_get_order( absint( $order_id ) );
 
-		if ( ! $order instanceof \WC_Order || $this->already_sent( $order ) ) {
+		if ( ! $order instanceof \WC_Order ) {
+			/* translators: %d: order ID. */
+			$this->log_action( sprintf( __( 'Order %d could not be loaded; nothing sent.', 'idta-pdf' ), absint( $order_id ) ) );
+
+			return;
+		}
+
+		if ( $this->already_sent( $order ) ) {
+			$this->log_action(
+				sprintf(
+					/* translators: %s: order number. */
+					__( 'Order %s has already been told, or has used all its attempts; nothing sent.', 'idta-pdf' ),
+					$order->get_order_number()
+				)
+			);
+
 			return;
 		}
 
@@ -201,12 +292,23 @@ final class Release_Notifier {
 		 * permit is ready.
 		 */
 		if ( ! $this->releases->is_released( $order ) ) {
+			$this->log_action(
+				sprintf(
+					/* translators: 1: order number, 2: the reason it is held back. */
+					__( 'Order %1$s is no longer released, so nothing was sent. %2$s', 'idta-pdf' ),
+					$order->get_order_number(),
+					$this->releases->reason( $order )
+				)
+			);
+
 			return;
 		}
 
 		$mailer = function_exists( 'WC' ) ? WC()->mailer() : null;
 
 		if ( null === $mailer ) {
+			$this->log_action( __( 'WooCommerce is not available, so nothing was sent.', 'idta-pdf' ) );
+
 			return;
 		}
 
@@ -214,6 +316,8 @@ final class Release_Notifier {
 		$email  = $emails['IDTA_PDF_Release'] ?? null;
 
 		if ( ! $email instanceof Release_Email ) {
+			$this->log_action( __( 'The permit-ready email is not registered with WooCommerce, so nothing was sent.', 'idta-pdf' ) );
+
 			return;
 		}
 
@@ -242,11 +346,30 @@ final class Release_Notifier {
 		$sent = $email->trigger( $order->get_id(), $order );
 
 		if ( $sent ) {
-			$order->update_meta_data( Release_Email::SENT_META, time() );
+			$order->update_meta_data( self::SENT_META, time() );
 			$order->save_meta_data();
+
+			$this->log_action(
+				sprintf(
+					/* translators: 1: order number, 2: recipient email address. */
+					__( 'Permit-ready email for order %1$s sent to %2$s.', 'idta-pdf' ),
+					$order->get_order_number(),
+					$order->get_billing_email()
+				)
+			);
 
 			return;
 		}
+
+		$this->log_action(
+			sprintf(
+				/* translators: 1: order number, 2: attempt number, 3: maximum attempts. */
+				__( 'Permit-ready email for order %1$s failed to send (attempt %2$d of %3$d).', 'idta-pdf' ),
+				$order->get_order_number(),
+				$attempts,
+				self::MAX_ATTEMPTS
+			)
+		);
 
 		$order->add_order_note(
 			sprintf(
@@ -272,7 +395,7 @@ final class Release_Notifier {
 	 * @return bool
 	 */
 	private function already_sent( \WC_Order $order ): bool {
-		if ( '' !== (string) $order->get_meta( Release_Email::SENT_META, true ) ) {
+		if ( '' !== (string) $order->get_meta( self::SENT_META, true ) ) {
 			return true;
 		}
 

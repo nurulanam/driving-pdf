@@ -176,10 +176,57 @@ final class Plugin {
 
 		Public_Pages::ensure_pages();
 		$this->adopt_new_documents();
+		$this->adopt_release_statuses();
 		$this->discard_stored_documents();
 		$this->remove_orphaned_files();
 
 		update_option( self::VERSION_OPTION, VERSION );
+	}
+
+	/**
+	 * Make sure a paid order can always be downloaded.
+	 *
+	 * The `trigger_statuses` setting used to mean "generate the documents when
+	 * the order reaches one of these", and a store that ticked pending and
+	 * processing — a perfectly sensible choice for that question — was saying
+	 * nothing at all about downloads. The same stored value now decides who may
+	 * download, so that list silently withheld documents from every completed
+	 * order: an operator moving an order from processing to completed, which is
+	 * the ordinary next step, took the permit away from a customer who already
+	 * had it.
+	 *
+	 * Reusing the key kept everyone's configuration, which was right; not
+	 * revisiting its contents when the meaning changed was not. This adds the
+	 * statuses WooCommerce itself counts as paid, once, so completing an order
+	 * can never revoke a permit. An operator who genuinely wants to withhold
+	 * from one of them can untick it afterwards and it stays unticked.
+	 */
+	private function adopt_release_statuses(): void {
+		$stored = get_option( Settings::OPTION_KEY );
+
+		if ( ! is_array( $stored ) || ! isset( $stored['trigger_statuses'] ) || ! is_array( $stored['trigger_statuses'] ) ) {
+			return;
+		}
+
+		$paid = function_exists( 'wc_get_is_paid_statuses' )
+			? (array) wc_get_is_paid_statuses()
+			: array( 'processing', 'completed' );
+
+		$missing = array_diff( $paid, $stored['trigger_statuses'] );
+
+		if ( array() === $missing ) {
+			return;
+		}
+
+		$stored['trigger_statuses'] = array_values(
+			array_unique( array_merge( $stored['trigger_statuses'], $missing ) )
+		);
+
+		update_option( Settings::OPTION_KEY, $stored );
+
+		$this->log(
+			sprintf( 'Added %s to the release statuses: a paid order must stay downloadable.', implode( ', ', $missing ) )
+		);
 	}
 
 	/**

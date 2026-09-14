@@ -160,30 +160,30 @@ final class Order_Admin {
 	 */
 	private function render_release( \WC_Order $order ): void {
 		if ( $this->releases->is_released( $order ) ) {
+			$kind = $this->releases->is_rush( $order )
+				? __( 'Rush order.', 'idta-pdf' )
+				: __( 'Standard order.', 'idta-pdf' );
+
+			// Said plainly, because it is the thing an operator most needs to
+			// know before changing anything: this one cannot be taken back.
+			if ( $this->releases->has_been_notified( $order ) ) {
+				$kind .= ' ' . __( 'The customer has their links, so this stays released.', 'idta-pdf' );
+			}
+
 			printf(
 				'<p style="margin:0 0 10px;"><span style="color:#00622b;font-weight:600;">%1$s</span><br><small>%2$s</small></p>',
 				esc_html__( 'Released to the customer', 'idta-pdf' ),
-				esc_html(
-					$this->releases->is_rush( $order )
-						? __( 'Rush order.', 'idta-pdf' )
-						: __( 'Standard order.', 'idta-pdf' )
-				)
+				esc_html( $kind )
 			);
 
 			return;
 		}
 
-		$when = $this->releases->released_at_local( $order );
-
 		printf(
-			'<p style="margin:0 0 10px;"><span style="color:#8a5700;font-weight:600;">%1$s</span><br><small>%2$s</small></p>',
+			'<p style="margin:0 0 10px;"><span style="color:#8a5700;font-weight:600;">%1$s</span><br><small>%2$s</small><br><small>%3$s</small></p>',
 			esc_html__( 'Not yet released to the customer', 'idta-pdf' ),
-			esc_html(
-				'' !== $when
-					/* translators: %s: a date and time. */
-					? sprintf( __( 'Available to them from %s. Your links above work now.', 'idta-pdf' ), $when )
-					: __( 'The order is not paid, so there is nothing to time the wait from. Your links above work now.', 'idta-pdf' )
-			)
+			esc_html( $this->releases->reason( $order ) ),
+			esc_html__( 'Your own links above work now.', 'idta-pdf' )
 		);
 	}
 
@@ -196,7 +196,7 @@ final class Order_Admin {
 	 * @param \WC_Order $order Order object.
 	 */
 	private function render_email_state( \WC_Order $order ): void {
-		$sent = (string) $order->get_meta( Release_Email::SENT_META, true );
+		$sent = (string) $order->get_meta( Release_Notifier::SENT_META, true );
 
 		if ( '' !== $sent ) {
 			printf(

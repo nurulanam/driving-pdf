@@ -386,6 +386,9 @@ final class Settings_Page {
 									<p class="description" style="margin-top:8px;">
 										<?php esc_html_e( 'A customer may download only while their order holds one of these statuses. An unpaid order is never released, whatever is ticked, because the wait is measured from payment.', 'idta-pdf' ); ?>
 									</p>
+									<p class="description" style="color:#8a5700;">
+										<?php esc_html_e( 'Leave both "Processing" and "Completed" ticked unless you mean to withhold from them: unticking one revokes access the moment an order reaches it, so completing an order would take the permit away from a customer who already had it.', 'idta-pdf' ); ?>
+									</p>
 								</td>
 							</tr>
 						</table>
