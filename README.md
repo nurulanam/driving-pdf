@@ -1,13 +1,19 @@
 # IDTA PDF
 
-Generates two PDFs from WooCommerce order meta when an IDP order is placed:
+Renders International Driving Permit documents from WooCommerce order meta.
 
-| Document | Page size | Orientation |
+| Document | Page size | Audience |
 | --- | --- | --- |
-| Permit booklet | 210 × 297 mm (A4) | Portrait |
-| Permit card | 85.6 × 53.98 mm (ISO/IEC 7810 ID-1) | Portrait |
+| Permit booklet | 210 × 297 mm (A4) portrait, 24 pages | Customer |
+| Permit card | 85.6 × 53.98 mm (ISO/IEC 7810 ID-1) portrait, 2 pages | Customer |
+| Permit print | 148 × 210 mm (A5), holder details only | Operator — overlay for pre-printed stock |
+| Card front | 1011 × 638 px, 24-bit BMP at 300 dpi | Operator — direct-to-card printer |
 
 Base font size is **10 pt**; custom CSS is loaded afterwards and overrides it.
+
+**Nothing is stored.** A document is rendered when its URL is opened and streamed
+straight to the browser — there is no generation queue, no per-order folder, and
+no file to go stale. See [Rendering and release](#rendering-and-release).
 
 ## Install
 
@@ -33,7 +39,6 @@ It wires up:
 | `idta_pdf_booklet_closing_pages` | Pages after the holder page |
 | `idta_pdf_seal_url` | Per-category seal (granted / not granted) |
 | `idta_pdf_brand_url` | Booklet `cover_logo`, `logo`, `signature`, `stamp`, `wordmark`, `un_emblem`, `qr_left`, `qr_right` |
-| `idta_pdf_flag_url` | Per-language flag on a translation page |
 | `idta_pdf_brand_site`, `idta_pdf_brand_email` | Contact details on the back cover |
 | `idta_pdf_card_artwork_url` | Card `front`, `back`, `stamp` |
 
@@ -56,8 +61,9 @@ _idp_country_of_birth
 
 A shop manager can read and correct all of these on the order screen, under **IDP
 Driver Details (editable)**, with a thumbnail for each of the four uploaded
-images. Saving only updates the order — use **Regenerate** in the IDP Documents
-panel to rebuild the PDFs afterwards.
+images. Saving updates the order and that is all that is needed: documents are rendered
+when their link is opened, so the next download reflects the correction. There is
+nothing to rebuild.
 
 ### Uploaded images: `_idp_assets` and `_idp_order_from`
 
@@ -113,7 +119,9 @@ Derived values:
 - **Expiry** = order date + `_idp_validity_years` − 1 day.
 - **Convention** = 1968 when `_idp_country_of_issuance` is a Vienna 1968 party, else 1949.
 - **Categories** — `"A, B"`, `"A/B"`, `"a b"` all parse to `['A','B']`.
-- **`_idp_format`** narrows generation to card-only or booklet-only when it says so.
+- **`_idp_format`** narrows an order to card-only or booklet-only when it says
+  so, matching on the words `card` and `booklet`/`book`. A value naming neither —
+  "Digital Only", say — offers everything, since it has said nothing either way.
 
 Remote images are downloaded once, cached for 24 h, and handed to the engine as
 local file paths, so the PDF engine never makes its own outbound request. The
@@ -127,7 +135,7 @@ resolve:
 
 | Page | Slug | Shows |
 | --- | --- | --- |
-| Permit | `/idp/` | A download link for the permit PDF, and the card when the order has one |
+| Permit | `/idp/` | Links to the permit and card, once the order's permit is released |
 | Details | `/show-details/` | Name, birth country, DOB, gender, licence types, and the licence scans |
 
 Both are reached as `?entry_key=<token>`, an AES-256-CBC token of the order ID
@@ -153,14 +161,123 @@ your-theme/idta-pdf/public/details.php
 
 Restyle without touching markup through the `idta_pdf_public_css` filter.
 
-## Behaviour
+## Rendering and release
 
-- Generation is queued via Action Scheduler (falling back to WP-Cron) so
-  checkout is never blocked, and runs once per order.
-- Documents are written to `uploads/idta-pdf/documents/<year>/<month>/<id>-<token>/`
-  and served only through an authorised download endpoint — never linked directly.
-- The order edit screen gains an **IDP Documents** panel with download and
-  regenerate actions, plus the last error if generation failed.
+Documents are not built ahead of time and not kept. `Download_Handler` renders
+the document a URL asks for and streams the bytes out, so every link is current
+by construction and nothing can be left on disk after a permit is delivered. The
+cost is a render per download — the booklet is a couple of seconds — which is why
+customers' uploaded photos are still cached: without that, every render would
+re-fetch the portrait over the network.
+
+PDFs are served **inline**, so following a link shows the permit at once; add
+`&download=1` to force a save. A bitmap is always a file.
+
+### Who may download, and when
+
+`Release_Schedule` answers one question per request: may this URL be opened yet?
+Three conditions, all required.
+
+| Condition | Detail |
+| --- | --- |
+| Paid | The wait runs from `date_paid`. An order marked paid by hand is timed from when it was placed. |
+| Status | The order holds one of the statuses set under **IDTA PDF → Release**. |
+| Wait | **5 minutes** for a rush order, **4 hours** otherwise, both configurable. |
+
+A **rush order** is one containing a configured rush product — matched on product
+*or* variation ID, default `20`.
+
+This is arithmetic, not a scheduled job: `time() >= paid_at + delay`, evaluated
+during the request. Nothing can fail to fire, it is exact to the second, and
+changing a delay takes effect immediately for every order.
+
+**Operators bypass the gate entirely**, decided on the `edit_shop_orders`
+capability rather than a nonce — a nonce expires after a day, and a bookmarked
+document link would otherwise be quietly demoted to a customer link.
+
+**Once the customer has been emailed, release is permanent.** No status change,
+longer wait, or refund takes it back: those links are in an email they keep, and
+a link handed out and then broken is worse than one never sent. Withdraw one
+deliberately through `idta_pdf_is_released`.
+
+Filters: `idta_pdf_is_released`, `idta_pdf_generation_delay`,
+`idta_pdf_is_rush_order`, `idta_pdf_requested_documents`.
+
+### The permit-ready email
+
+A `WC_Email` — so it appears in **WooCommerce → Settings → Emails** as *Permit
+ready*, with the usual subject, heading and on/off controls, rendered inside the
+store's own header and footer. It carries **links, not attachments**: there is no
+file to attach, and a booklet exceeds what most mail servers accept.
+
+It shows two buttons, **Booklet** and **Digital Card**, then the order's virtual
+lines with their own download links where they have them.
+
+This is the only scheduled job the plugin keeps — the email goes out at a moment
+nothing else brings about. It is queued with Action Scheduler in the `idta-pdf`
+group at the release time, or sent immediately if that has already passed. Each
+action logs its own outcome, so **WooCommerce → Status → Scheduled Actions**
+reads one line per order:
+
+```
+Permit-ready email for order 1105 sent to holder@example.com.
+Order 1107 is no longer released, so nothing was sent. Held back: …
+```
+
+Three attempts, then it stops; the attempt is recorded before the send and the
+success only after, so a broken mail stack cannot mark every order as notified.
+An operator can always send it by hand with **Resend order emails**.
+
+Theme overrides: `woocommerce/emails/permit-ready.php` and
+`woocommerce/emails/plain/permit-ready.php`.
+
+### Card bitmap
+
+A direct-to-card printer — a Zebra ZC300, say — prints a 300 dpi grid and its
+driver resamples whatever it is handed. Handing it a PDF means rasterising once
+and resampling again, which the card's 5.7 pt type does not survive: a stem is
+about 0.14 mm, under two dots. The bitmap is already 1011 × 638, one pixel per
+dot, so nothing is resampled.
+
+It is a render of the card PDF rather than a second layout, which is what keeps
+the header's Arabic shaping intact — nothing in PHP's image library can shape
+Arabic. Needs Imagick, Ghostscript or `pdftoppm`; the setting disables itself and
+says so when none is reachable. Front only: the back is the same on every card.
+
+Card text is `#000000`, not near-black. A ZC300 routes only pure black to the
+resin panel, so `#111111` printed through the three dye panels and looked faded.
+
+### Order screens
+
+The order edit screen and the orders list both link every document the order
+offers, always current. There is no Generate or Regenerate — there is nothing to
+rebuild. Both show whether the customer's own links have opened yet, and if not,
+which of the three conditions is holding them back.
+
+## Order lines and the thank-you page
+
+**Product names.** The store's permit products are renamed wherever an order line
+is shown — order screens, every WooCommerce email, invoices, exports, the REST
+API. Done at the property getter (`woocommerce_order_item_get_name`), so it does
+not depend on which template renders the line, and in *view* context only: the
+name stored on the order is never overwritten, and removing the mapping restores
+it. Edit the map in `includes/class-product-names.php` or through the
+`idta_pdf_product_names` filter.
+
+**Thank-you redirect.** After payment, an order is sent to the front end that
+took it, chosen by `_idp_order_from`, with the conversion details its own
+analytics expects:
+
+```
+https://e-idta.com/thank-you.html?order-id=idta-957&transaction-id=ch_3Qx…&currency=JPY&value=12000
+```
+
+`transaction-id` is omitted when the gateway records none — an empty one in a
+conversion tag deduplicates against every other order that also sent nothing. The
+value passes through at the precision it was charged at, which matters in a store
+selling in more than one currency. Filters: `idta_pdf_thankyou_destinations`,
+`idta_pdf_thankyou_order_arg`, `idta_pdf_thankyou_order_reference`,
+`idta_pdf_thankyou_query_args`.
 
 ## Customising
 
@@ -243,16 +360,15 @@ The vehicle-category letters A–E are the one element identical on all nineteen
 pages, so they are always set in `dejavuserif` whatever script font the page
 uses.
 
-### Flags
+### Language names
 
-Flags come from `assets/img/Flag/`, named after the language label the page
-prints — `Français.png` is the flag on the French page. All nineteen are bundled.
+Booklet pages 4–22 and the language index used to be headed by a flag. They are
+not any more: each page prints the language's own name, set in that page's script
+font, and the index lists the names. The nineteen flag files were being base64'd
+into the HTML on every render — nineteen of them, laid out and never drawn.
 
-Override one file at a time with the `idta_pdf_flag_url` filter, or set
-`flag_image` on a language entry to a path or URL. With no artwork at all a page
-falls back to `flag` (three colours drawn as a vertical tricolour — the only flag
-a three-cell strip renders honestly), and failing that prints the language name
-rather than misrepresent a flag.
+`assets/img/Flag/` and the `idta_pdf_flag_url` filter still exist for a custom
+page that wants one, but nothing in the shipped templates reads them.
 
 ### Registering another font
 
@@ -331,9 +447,13 @@ the page templates are built around them:
 | --- | --- | --- |
 | Booklet | 24 — cover, 21 translation/reference pages, holder details, back cover | ~1.5 MB |
 | Card | 2 — front, back | ~0.65 MB |
+| Permit print | 4 — two blank, cover date, holder details | ~0.2 MB |
+| Card front (BMP) | 1 — 1011 × 638, 24-bit uncompressed | 1.9 MB |
 
 Every booklet page is rendered from text and artwork rather than a page scan,
 which took the booklet from 12.7 MB to about 1.5 MB.
+
+None of these is written to disk. The figures are what the browser receives.
 
 ## mPDF quirks worth knowing
 
@@ -356,5 +476,12 @@ The stylesheets and image pipeline depend on them:
 
 ## Requirements
 
-PHP 8.0+, WordPress 6.0+, WooCommerce 7.0+, `openssl`. GD is optional and only
-needed for the grayscale duplicate portrait.
+PHP 8.0+, WordPress 6.0+, WooCommerce 7.0+, `openssl`.
+
+GD is needed for the grayscale duplicate portrait and for the card bitmap. The
+bitmap also needs a PDF rasteriser — the Imagick extension, Ghostscript or
+`pdftoppm` — and that export is offered only where one is present. Everything
+else works without any of them.
+
+**WooCommerce → IDTA PDF → Status** reports what the server can actually do:
+engine, QR library, rasteriser and storage.
