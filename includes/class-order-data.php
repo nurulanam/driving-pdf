@@ -36,6 +36,11 @@ final class Order_Data {
 		'_idp_validity_years'        => 'Validity Years',
 		'_idp_format'                => 'IDP Format',
 		'_idp_assets'                => 'Assets Folder',
+		// Written by the storefront so an order can be matched back to the
+		// partial application it came from. Read by idta-partial only; nothing
+		// in this plugin consults it, and an order without one behaves exactly
+		// as it always has.
+		'_idp_lead_token'            => 'Lead Token',
 	);
 
 	/**
