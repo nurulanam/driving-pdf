@@ -51,7 +51,7 @@ $print_values = array(
 <?php // ------------------------------- 2: the cover's expiry date only ---- ?>
 <div class="pc-page pc-page--break">
 	<div class="pc-date">
-		<div class="pc-date__value"><?php echo esc_html( (string) $context['expiry_date'] ); ?></div>
+		<div class="pc-date__value"><?php echo esc_html( (string) $context['expiry_date'] . ' (EX)' ); ?></div>
 	</div>
 </div>
 

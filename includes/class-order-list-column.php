@@ -161,6 +161,7 @@ final class Order_List_Column {
 		}
 
 		$this->render_release( $order );
+		$this->render_email_state( $order );
 		$this->render_error( $order );
 
 		echo '</div>';
@@ -179,7 +180,7 @@ final class Order_List_Column {
 		if ( $this->releases->is_released( $order ) ) {
 			printf(
 				'<span class="dashicons dashicons-yes-alt" style="color:#00622b;" title="%s"></span>',
-				esc_attr__( 'Released: the customer can download this now.', 'idta-pdf' )
+				esc_attr__( 'Released: the customer can download this now. This says nothing about the email — see the envelope beside it.', 'idta-pdf' )
 			);
 
 			return;
@@ -194,6 +195,68 @@ final class Order_List_Column {
 					/* translators: %s: a date and time. */
 					? sprintf( __( 'Held back from the customer until %s.', 'idta-pdf' ), $when )
 					: __( 'Held back: the order is not paid.', 'idta-pdf' )
+			)
+		);
+	}
+
+	/**
+	 * A marker for the permit-ready email, beside the release one.
+	 *
+	 * The two answer different questions and were being read as one. A green
+	 * tick means the customer's links work; it says nothing about whether they
+	 * were ever told, and an order can sit released and unannounced for days
+	 * when the mail server is the thing that is broken. The envelope reports
+	 * that separately, so a failure is visible from the list rather than only
+	 * from inside the order.
+	 *
+	 * @param \WC_Order $order Order object.
+	 */
+	private function render_email_state( \WC_Order $order ): void {
+		$sent = (string) $order->get_meta( Release_Notifier::SENT_META, true );
+
+		if ( '' !== $sent ) {
+			printf(
+				'<span class="dashicons dashicons-email" style="color:#00622b;" title="%s"></span>',
+				esc_attr(
+					sprintf(
+						/* translators: %s: a date and time. */
+						__( 'Permit email sent %s.', 'idta-pdf' ),
+						(string) wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $sent )
+					)
+				)
+			);
+
+			return;
+		}
+
+		$attempts = (int) $order->get_meta( Release_Notifier::ATTEMPTS_META, true );
+
+		if ( $attempts > 0 ) {
+			printf(
+				'<span class="dashicons dashicons-email-alt" style="color:#b32d2e;" title="%s"></span>',
+				esc_attr(
+					sprintf(
+						/* translators: %d: number of attempts. */
+						_n(
+							'Permit email failed after %d attempt. Open the order and use "Send permit email now".',
+							'Permit email failed after %d attempts. Open the order and use "Send permit email now".',
+							$attempts,
+							'idta-pdf'
+						),
+						$attempts
+					)
+				)
+			);
+
+			return;
+		}
+
+		printf(
+			'<span class="dashicons dashicons-email-alt" style="color:#8c8f94;" title="%s"></span>',
+			esc_attr(
+				$this->releases->is_released( $order )
+					? __( 'Permit email not sent yet.', 'idta-pdf' )
+					: __( 'Permit email goes out when the order is released.', 'idta-pdf' )
 			)
 		);
 	}

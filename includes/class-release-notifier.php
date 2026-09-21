@@ -32,6 +32,16 @@ final class Release_Notifier {
 	public const HOOK = 'idta_pdf_send_release_email';
 
 	/**
+	 * Daily sweep that catches orders the scheduled send missed.
+	 */
+	public const SWEEP_HOOK = 'idta_pdf_release_sweep';
+
+	/**
+	 * How far back the sweep looks.
+	 */
+	private const SWEEP_WINDOW_DAYS = 14;
+
+	/**
 	 * Order meta recording when the permit-ready email was sent.
 	 *
 	 * Declared here rather than on Release_Email, which is where it belongs
@@ -94,6 +104,24 @@ final class Release_Notifier {
 		add_action( self::HOOK, array( $this, 'send' ), 10, 1 );
 
 		/*
+		 * A safety net under the scheduled send. Everything else here reacts to
+		 * an event — payment, a status change — so an order whose queued action
+		 * is lost has nothing left to bring it back: the queue can be cleared, a
+		 * migration can drop it, a host can kill the run. The order would then
+		 * sit released and unannounced indefinitely, and nobody would know.
+		 *
+		 * WP-Cron rather than a recurring action, because asking Action
+		 * Scheduler whether the sweep is scheduled costs a query on every
+		 * request, while wp_next_scheduled() reads an option that is already
+		 * loaded. The sweep itself still queues through Action Scheduler.
+		 */
+		add_action( self::SWEEP_HOOK, array( $this, 'sweep' ) );
+
+		if ( ! wp_next_scheduled( self::SWEEP_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::SWEEP_HOOK );
+		}
+
+		/*
 		 * Note which action is running, so send() can write what it did into
 		 * that action's own log. Without it the Scheduled Actions screen says
 		 * only that the action completed, which is equally true of an email
@@ -101,6 +129,15 @@ final class Release_Notifier {
 		 */
 		add_action( 'action_scheduler_before_execute', array( $this, 'note_running_action' ), 10, 1 );
 		add_action( 'action_scheduler_after_execute', array( $this, 'forget_running_action' ), 10, 1 );
+
+		/*
+		 * Record the send wherever it came from — the scheduled run, the button
+		 * on the order screen, or WooCommerce's own "Resend order emails".
+		 * Recording it in send() alone meant a manual send left the order still
+		 * marked as never notified, so it kept its failed-attempt count and its
+		 * release stayed revocable.
+		 */
+		add_action( 'woocommerce_email_sent', array( $this, 'record_sent' ), 10, 3 );
 
 		add_filter( 'woocommerce_email_classes', array( $this, 'register_email' ) );
 		add_filter( 'woocommerce_resend_order_emails_available', array( $this, 'offer_resend' ) );
@@ -143,6 +180,84 @@ final class Release_Notifier {
 		$available[] = 'idta_pdf_release';
 
 		return $available;
+	}
+
+	/**
+	 * Note a successful send on the order.
+	 *
+	 * @param mixed  $success  Whether wp_mail() accepted the message.
+	 * @param string $email_id Email type ID.
+	 * @param mixed  $email    The email instance.
+	 */
+	public function record_sent( $success, $email_id = '', $email = null ): void {
+		if ( ! $success || 'idta_pdf_release' !== $email_id ) {
+			return;
+		}
+
+		$order = ( $email instanceof \WC_Email ) ? $email->object : null;
+
+		if ( ! $order instanceof \WC_Order ) {
+			return;
+		}
+
+		$order->update_meta_data( self::SENT_META, time() );
+
+		// A success clears the failures: whatever was wrong — an SMTP password,
+		// a rejected sender — has been put right, and the count exists only to
+		// stop the scheduled run pestering a broken mail stack.
+		$order->delete_meta_data( self::ATTEMPTS_META );
+		$order->save_meta_data();
+	}
+
+	/**
+	 * Send the email now, whatever the release rules say.
+	 *
+	 * For the button on the order screen: an operator asking for this has
+	 * already decided, and the usual reason is that the scheduled send failed
+	 * for something outside the order — a mail server that was misconfigured at
+	 * the time. None of the guards in send() apply.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return bool Whether the mail was accepted for delivery.
+	 */
+	public function dispatch( \WC_Order $order ): bool {
+		$email = $this->email();
+
+		return null !== $email && $email->trigger( $order->get_id(), $order );
+	}
+
+	/**
+	 * The registered permit-ready email, when WooCommerce has one.
+	 *
+	 * @return Release_Email|null
+	 */
+	private function email(): ?Release_Email {
+		/*
+		 * Stepped through rather than chained. This runs from a scheduled job,
+		 * and a fatal there does not fail one order — it kills the queue pass,
+		 * taking every unrelated action in the batch with it. Returning null is
+		 * a missed email; dereferencing something absent is an outage.
+		 */
+		if ( ! function_exists( 'WC' ) ) {
+			return null;
+		}
+
+		$woocommerce = WC();
+
+		if ( ! is_object( $woocommerce ) || ! method_exists( $woocommerce, 'mailer' ) ) {
+			return null;
+		}
+
+		$mailer = $woocommerce->mailer();
+
+		if ( ! is_object( $mailer ) || ! method_exists( $mailer, 'get_emails' ) ) {
+			return null;
+		}
+
+		$email = $mailer->get_emails()['IDTA_PDF_Release'] ?? null;
+
+		return $email instanceof Release_Email ? $email : null;
 	}
 
 	/**
@@ -191,6 +306,45 @@ final class Release_Notifier {
 		}
 
 		\ActionScheduler::logger()->log( $this->running_action, $message );
+	}
+
+	/**
+	 * Re-offer every recently paid order to the scheduler.
+	 *
+	 * maybe_schedule() decides each one on its merits and is cheap for an order
+	 * with nothing to do, so this needs no state of its own: an order already
+	 * told, already queued, or not yet due is left exactly as it is.
+	 *
+	 * Bounded deliberately. A window of a fortnight and a batch of fifty keeps
+	 * the sweep small on a busy store, and an order older than that has been
+	 * missed long enough that someone should look at it rather than have it
+	 * quietly appear.
+	 */
+	public function sweep(): void {
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return;
+		}
+
+		$statuses = function_exists( 'wc_get_is_paid_statuses' )
+			? (array) wc_get_is_paid_statuses()
+			: array( 'processing', 'completed' );
+
+		$orders = wc_get_orders(
+			array(
+				'limit'     => 50,
+				'status'    => $statuses,
+				'date_paid' => '>' . ( time() - self::SWEEP_WINDOW_DAYS * DAY_IN_SECONDS ),
+				'orderby'   => 'date',
+				'order'     => 'ASC',
+				'return'    => 'objects',
+			)
+		);
+
+		foreach ( (array) $orders as $order ) {
+			if ( $order instanceof \WC_Order ) {
+				$this->maybe_schedule( $order->get_id() );
+			}
+		}
 	}
 
 	/**
@@ -304,19 +458,10 @@ final class Release_Notifier {
 			return;
 		}
 
-		$mailer = function_exists( 'WC' ) ? WC()->mailer() : null;
+		$email = $this->email();
 
-		if ( null === $mailer ) {
-			$this->log_action( __( 'WooCommerce is not available, so nothing was sent.', 'idta-pdf' ) );
-
-			return;
-		}
-
-		$emails = $mailer->get_emails();
-		$email  = $emails['IDTA_PDF_Release'] ?? null;
-
-		if ( ! $email instanceof Release_Email ) {
-			$this->log_action( __( 'The permit-ready email is not registered with WooCommerce, so nothing was sent.', 'idta-pdf' ) );
+		if ( null === $email ) {
+			$this->log_action( __( 'The permit-ready email is not available, so nothing was sent.', 'idta-pdf' ) );
 
 			return;
 		}
@@ -346,9 +491,8 @@ final class Release_Notifier {
 		$sent = $email->trigger( $order->get_id(), $order );
 
 		if ( $sent ) {
-			$order->update_meta_data( self::SENT_META, time() );
-			$order->save_meta_data();
-
+			// Recorded on the order by record_sent(), which listens for the
+			// send itself and so catches a manual one too.
 			$this->log_action(
 				sprintf(
 					/* translators: 1: order number, 2: recipient email address. */

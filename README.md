@@ -226,7 +226,14 @@ Order 1107 is no longer released, so nothing was sent. Held back: …
 
 Three attempts, then it stops; the attempt is recorded before the send and the
 success only after, so a broken mail stack cannot mark every order as notified.
-An operator can always send it by hand with **Resend order emails**.
+
+**Send permit email now** on the order screen sends it there and then, past the
+wait and past the attempt count — for the case those guards get wrong, where the
+failure was nothing to do with the order and has since been fixed. A success is
+recorded by a `woocommerce_email_sent` listener rather than by the scheduled run,
+so it counts however it was triggered: the schedule, that button, or WooCommerce's
+own **Resend order emails**. It clears the failed attempts and releases the order
+for good.
 
 Theme overrides: `woocommerce/emails/permit-ready.php` and
 `woocommerce/emails/plain/permit-ready.php`.
@@ -246,6 +253,25 @@ says so when none is reachable. Front only: the back is the same on every card.
 
 Card text is `#000000`, not near-black. A ZC300 routes only pure black to the
 resin panel, so `#111111` printed through the three dye panels and looked faded.
+
+### Fallbacks
+
+Everything that queues the email reacts to an event — payment, a status change —
+so an order whose queued action is lost has nothing left to bring it back. A
+**daily sweep** re-offers every order paid in the last fortnight to
+`maybe_schedule()`, which decides each on its merits and is cheap for one with
+nothing to do. Bounded to fifty orders a run.
+
+The sweep's own timer is WP-Cron rather than a recurring action, because asking
+Action Scheduler whether it is scheduled costs a query on every request while
+`wp_next_scheduled()` reads an already-loaded option. The sends it triggers still
+go through Action Scheduler.
+
+Below that: Action Scheduler falls back to `wp_schedule_single_event` where it is
+absent, and `as_has_scheduled_action` counts only pending and running actions, so
+a *failed* action never blocks a later retry. The mailer lookup is stepped through
+rather than chained — a fatal in a scheduled run does not fail one order, it kills
+the whole queue pass.
 
 ### Order screens
 
@@ -342,6 +368,17 @@ seal, place, date, signature, footnote).
 | `unbatang` | Korean |
 | `freeserif` | Devanagari (Hindi), Amharic |
 | `garuda` | Thai |
+
+The build subsets `unbatang`, `xbriyaz` and `sun-exta` to the characters the
+pages actually use — `sun-exta` alone goes from 21.9MB to 51KB — and each was
+verified by rendering a line of its page with the whole font and with the subset
+and comparing the images pixel for pixel.
+
+**`garuda` is deliberately not subset.** Thai was the one script that did not
+survive it: the subset's cmap covered every character on the page, and mPDF still
+printed part of the text as hollow boxes — 86% more ink than the whole font. The
+saving was 42KB. Verify any font added to that list the same way, by looking at
+the rendered page rather than at the character coverage.
 
 `abyssinicasil` (Ethiopic) is also bundled and registered, but isn't the default
 for Amharic — its strokes read heavier and rounder than freeserif's. Available

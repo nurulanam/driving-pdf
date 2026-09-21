@@ -101,6 +101,18 @@ done < "$keep_list"
 #
 # freeserif is left whole on purpose. It is still a fallback, so it has to cover
 # more than these pages.
+#
+# garuda is left whole too, because subsetting it breaks Thai. The subset keeps
+# every character the page uses — its cmap was verified complete — and mPDF still
+# renders part of the text as hollow boxes, 86% more ink on the page than the
+# whole font produces. Thai needs reordering and mark attachment that survive the
+# round trip for Arabic and Korean but not for this face. It is 55KB whole and
+# 13KB subset: 42KB of an 11MB archive, which is no reason to risk a page of
+# boxes nobody in the office can proof-read.
+#
+# The other three were checked the same way and render pixel for pixel identical,
+# so they stay. Check any font added to this list the same way: render a line of
+# its page with the whole font and with the subset, and compare the images.
 if command -v pyftsubset >/dev/null; then
 	chars="$work/chars"
 	mkdir -p "$chars"
@@ -135,7 +147,7 @@ if command -v pyftsubset >/dev/null; then
 		require getenv( "STAGE" ) . "/includes/class-fonts.php";
 
 		foreach ( IDTA\PDF\Fonts::bundled() as $family => $faces ) {
-			if ( ! in_array( $family, array( "unbatang", "xbriyaz", "garuda", "sun-exta" ), true ) ) {
+			if ( ! in_array( $family, array( "unbatang", "xbriyaz", "sun-exta" ), true ) ) {
 				continue;
 			}
 

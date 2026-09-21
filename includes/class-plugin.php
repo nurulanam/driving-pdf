@@ -143,7 +143,16 @@ final class Plugin {
 
 		$downloads = new Download_Handler( $this->generator, $this->releases );
 
-		( new Order_Admin( $this->generator, $this->releases, $downloads ) )->register();
+		/*
+		 * The one scheduled job that remains. It builds nothing — it sends the
+		 * email that tells the customer their permit links have started working.
+		 * The order screen shares the instance so its "send now" button goes
+		 * through exactly the same path as the scheduled run.
+		 */
+		$notifier = new Release_Notifier( $this->releases );
+		$notifier->register();
+
+		( new Order_Admin( $this->generator, $this->releases, $downloads, $notifier ) )->register();
 
 		( new Order_Fields() )->register();
 		( new Product_Names() )->register();
@@ -152,12 +161,6 @@ final class Plugin {
 		$downloads->register();
 		( new Public_Pages( $this->generator, $this->settings, $this->releases ) )->register();
 		( new Thankyou_Redirect() )->register();
-
-		/*
-		 * The one scheduled job that remains. It builds nothing — it sends the
-		 * email that tells the customer their permit links have started working.
-		 */
-		( new Release_Notifier( $this->releases ) )->register();
 		( new Order_List_Column( $this->generator, $downloads, $this->releases ) )->register();
 	}
 
@@ -287,6 +290,7 @@ final class Plugin {
 		 */
 		wp_clear_scheduled_hook( self::ASYNC_HOOK );
 		wp_clear_scheduled_hook( Release_Notifier::HOOK );
+		wp_clear_scheduled_hook( Release_Notifier::SWEEP_HOOK );
 
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::ASYNC_HOOK, array(), 'idta-pdf' );

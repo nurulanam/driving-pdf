@@ -115,11 +115,28 @@ containing one of your rush products, four hours otherwise. The wait is measured
 from payment, so it is the same whether they paid at checkout or followed a pay
 link days later. Your own links work immediately.
 
+= What do the icons in the PDFs column mean? =
+
+Two separate things, deliberately. The **tick or clock** is the customer's
+download links — green once they work. The **envelope** beside it is the
+permit-ready email: green with the date once sent, red when it failed, grey while
+it is still to come. An order can legitimately be green-ticked and grey-enveloped
+for a few minutes; green-ticked and red-enveloped means the links work but nobody
+has been told, and wants the **Send permit email now** button.
+
 = An order shows a clock instead of a tick. =
 
 Hover it. It says which of the three conditions is holding the order back — not
 paid, a status you do not release documents for, or the wait itself, with the time
 it ends. Your own links above work regardless.
+
+= The permit email failed to send. =
+
+Fix the cause first — the reason is in **WooCommerce → Status → Logs**, source
+`transactional-emails` ("SMTP Error: Could not authenticate", for instance) — then
+open the order and press **Send permit email now** in the IDP Documents panel. It
+sends immediately, ignores the wait and the three-attempt limit, and on success
+clears the failed attempts and releases the order to the customer permanently.
 
 = The customer never received the permit email. =
 
@@ -164,6 +181,29 @@ the mPDF constraints the layout works within.
 4. The permit-ready email.
 
 == Changelog ==
+
+= 1.9.2 =
+* Fixed the Thai translation page printing hollow boxes among the text. The
+  build was subsetting its font, and that face does not survive the round trip
+  the others do; it now ships whole.
+* Booklet cover reads "Date (Ex):".
+
+= 1.9.1 =
+* The orders list now shows the permit email separately from the release marker:
+  an envelope, green when sent, red when it failed, grey when it is still to come.
+  A green tick only ever meant the links work.
+* Added a daily sweep that re-offers recently paid orders to the scheduler, so an
+  order whose queued send was lost is picked up rather than sitting unannounced.
+* Hardened the mailer lookup: a scheduled run can no longer fatal and take the
+  rest of the queue pass with it.
+
+= 1.9.0 =
+* **Send permit email now** button on the order screen, for when a send failed
+  for a reason outside the order — a mail server that was misconfigured at the
+  time. Goes straight past the wait and the attempt count.
+* A successful send is now recorded however it was triggered — the scheduled run,
+  the button, or WooCommerce's own Resend order emails — so a manual send clears
+  the failed attempts and releases the order for good.
 
 = 1.8.2 =
 * Each scheduled action now logs its own outcome, so Scheduled Actions reads one
