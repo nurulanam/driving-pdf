@@ -580,6 +580,65 @@ final class Settings_Page {
 							</button>
 						</p>
 					</div>
+
+					<div class="idta-card">
+						<h2><?php esc_html_e( 'Thank-you redirects', 'idta-pdf' ); ?></h2>
+						<p class="idta-card__intro">
+							<?php esc_html_e( 'Each row maps the same "_idp_order_from" value to the thank-you page a paid order is sent to once its order key is verified. Blank rows are ignored; leaving every row blank restores the built-in defaults.', 'idta-pdf' ); ?>
+						</p>
+						<?php
+						$configured_destinations = is_array( $values['thankyou_destinations'] ) && array() !== $values['thankyou_destinations']
+							? $values['thankyou_destinations']
+							: Thankyou_Redirect::DESTINATIONS;
+
+						$destination_rows = array();
+
+						foreach ( $configured_destinations as $dest_key => $dest_url ) {
+							$destination_rows[] = array( (string) $dest_key, (string) $dest_url );
+						}
+
+						for ( $i = 0; $i < 2; $i++ ) {
+							$destination_rows[] = array( '', '' );
+						}
+						?>
+						<table class="idta-thankyou-rows widefat striped" style="max-width:860px;margin-top:12px;">
+							<thead>
+								<tr>
+									<th style="width:200px;"><?php esc_html_e( 'Order From value', 'idta-pdf' ); ?></th>
+									<th><?php esc_html_e( 'Thank-you page URL', 'idta-pdf' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $destination_rows as $row_index => $destination_row ) : ?>
+									<tr>
+										<td>
+											<input
+												type="text"
+												name="idta_pdf[thankyou_destinations][<?php echo (int) $row_index; ?>][key]"
+												value="<?php echo esc_attr( $destination_row[0] ); ?>"
+												class="code" style="width:100%;"
+												placeholder="<?php esc_attr_e( 'e.g. idta', 'idta-pdf' ); ?>"
+											>
+										</td>
+										<td>
+											<input
+												type="url"
+												name="idta_pdf[thankyou_destinations][<?php echo (int) $row_index; ?>][url]"
+												value="<?php echo esc_attr( $destination_row[1] ); ?>"
+												class="code" style="width:100%;"
+												placeholder="https://…/thank-you.html"
+											>
+										</td>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+						<p style="margin-top:10px;">
+							<button type="button" class="button" id="idta-add-thankyou">
+								<?php esc_html_e( '+ Add redirect', 'idta-pdf' ); ?>
+							</button>
+						</p>
+					</div>
 				</div>
 
 				<!-- Styling -->
@@ -754,6 +813,24 @@ final class Settings_Page {
 							row.innerHTML =
 								'<td><input type="text" class="code" style="width:100%" name="idta_pdf[asset_sources][' + index + '][key]"></td>' +
 								'<td><input type="url" class="code" style="width:100%" name="idta_pdf[asset_sources][' + index + '][url]"></td>';
+
+							body.appendChild( row );
+						} );
+					}
+
+					var addThankyou = document.getElementById( 'idta-add-thankyou' );
+
+					if ( addThankyou ) {
+						addThankyou.addEventListener( 'click', function ( event ) {
+							event.preventDefault();
+
+							var body  = document.querySelector( '.idta-thankyou-rows tbody' );
+							var index = body.querySelectorAll( 'tr' ).length;
+							var row   = document.createElement( 'tr' );
+
+							row.innerHTML =
+								'<td><input type="text" class="code" style="width:100%" name="idta_pdf[thankyou_destinations][' + index + '][key]"></td>' +
+								'<td><input type="url" class="code" style="width:100%" name="idta_pdf[thankyou_destinations][' + index + '][url]"></td>';
 
 							body.appendChild( row );
 						} );

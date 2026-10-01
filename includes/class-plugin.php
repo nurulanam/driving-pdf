@@ -160,7 +160,7 @@ final class Plugin {
 		( new Settings_Page( $this->settings ) )->register();
 		$downloads->register();
 		( new Public_Pages( $this->generator, $this->settings, $this->releases ) )->register();
-		( new Thankyou_Redirect() )->register();
+		( new Thankyou_Redirect( $this->settings ) )->register();
 		( new Order_List_Column( $this->generator, $downloads, $this->releases ) )->register();
 	}
 

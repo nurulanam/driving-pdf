@@ -63,6 +63,10 @@ final class Settings {
 			// Order_Data::SOURCES when nothing is configured, so upgrading sites
 			// keep working without a trip to this screen first.
 			'asset_sources'    => Order_Data::SOURCES,
+			// Thank-you page each front end's order is sent to after payment,
+			// keyed the same way as asset_sources. Falls back to
+			// Thankyou_Redirect::DESTINATIONS when nothing is configured.
+			'thankyou_destinations' => Thankyou_Redirect::DESTINATIONS,
 			'grayscale_ghost'  => true,
 			/*
 			 * Generation is deferred, and how long by depends on what was
@@ -170,7 +174,8 @@ final class Settings {
 		$clean['qr_permit_secret']  = sanitize_text_field( (string) ( $input['qr_permit_secret'] ?? '' ) );
 		$clean['qr_details_secret'] = sanitize_text_field( (string) ( $input['qr_details_secret'] ?? '' ) );
 
-		$clean['asset_sources'] = $this->sanitize_sources( (array) ( $input['asset_sources'] ?? array() ) );
+		$clean['asset_sources']         = $this->sanitize_keyed_urls( (array) ( $input['asset_sources'] ?? array() ), Order_Data::SOURCES );
+		$clean['thankyou_destinations'] = $this->sanitize_keyed_urls( (array) ( $input['thankyou_destinations'] ?? array() ), Thankyou_Redirect::DESTINATIONS );
 
 		/*
 		 * Product IDs arrive as the comma-separated list the field shows. Zero
@@ -208,15 +213,18 @@ final class Settings {
 	}
 
 	/**
-	 * Sanitize the upload-source rows posted from the settings screen.
+	 * Sanitize a set of "Order From value" => "URL" rows posted from the
+	 * settings screen. Shared by the upload-sources and thank-you-redirect
+	 * tables, which are the same shape.
 	 *
-	 * @param array<int,mixed> $rows Rows, each expected to have 'key' and 'url'.
+	 * @param array<int,mixed>     $rows     Rows, each expected to have 'key' and 'url'.
+	 * @param array<string,string> $fallback Returned when every row is blank or
+	 *                                        missing, so the setting can never
+	 *                                        leave its feature resolving nothing.
 	 *
-	 * @return array<string,string> Falls back to Order_Data::SOURCES when every
-	 *                               row is blank or missing, so the setting can
-	 *                               never leave asset resolution with nothing.
+	 * @return array<string,string>
 	 */
-	private function sanitize_sources( array $rows ): array {
+	private function sanitize_keyed_urls( array $rows, array $fallback ): array {
 		$clean = array();
 
 		foreach ( $rows as $row ) {
@@ -234,7 +242,7 @@ final class Settings {
 			$clean[ $key ] = $url;
 		}
 
-		return array() !== $clean ? $clean : Order_Data::SOURCES;
+		return array() !== $clean ? $clean : $fallback;
 	}
 
 	/**
@@ -428,6 +436,24 @@ final class Settings {
 		}
 
 		return array() !== $clean ? $clean : Order_Data::SOURCES;
+	}
+
+	/**
+	 * Thank-you page URLs, keyed by the value stored in `_idp_order_from`.
+	 *
+	 * @return array<string,string>
+	 */
+	public function thankyou_destinations(): array {
+		$destinations = (array) $this->get( 'thankyou_destinations', Thankyou_Redirect::DESTINATIONS );
+		$clean        = array();
+
+		foreach ( $destinations as $key => $url ) {
+			if ( is_string( $key ) && is_string( $url ) && '' !== trim( $url ) ) {
+				$clean[ strtolower( trim( $key ) ) ] = trim( $url );
+			}
+		}
+
+		return array() !== $clean ? $clean : Thankyou_Redirect::DESTINATIONS;
 	}
 
 	/**

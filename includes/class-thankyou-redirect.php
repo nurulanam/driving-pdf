@@ -27,14 +27,34 @@ defined( 'ABSPATH' ) || exit;
 final class Thankyou_Redirect {
 
 	/**
-	 * Thank-you page for each `_idp_order_from` value.
+	 * Built-in thank-you page for each `_idp_order_from` value.
+	 *
+	 * The canonical fallback: Settings::thankyou_destinations() returns these
+	 * when the settings screen's "Thank-you redirects" table has not been
+	 * configured, exactly as Order_Data::SOURCES backs asset_sources().
 	 *
 	 * @var array<string,string>
 	 */
-	private const DESTINATIONS = array(
+	public const DESTINATIONS = array(
 		'idta' => 'https://e-idta.com/thank-you.html',
 		'idpa' => 'https://internationaldrivingpermitagency.com/thank-you/',
 	);
+
+	/**
+	 * Settings.
+	 *
+	 * @var Settings
+	 */
+	private Settings $settings;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Settings $settings Settings.
+	 */
+	public function __construct( Settings $settings ) {
+		$this->settings = $settings;
+	}
 
 	/**
 	 * Register hooks.
@@ -81,7 +101,7 @@ final class Thankyou_Redirect {
 			return;
 		}
 
-		wp_redirect( $destination, 302 ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Deliberately off-site; the target comes from self::DESTINATIONS, never from the request.
+		wp_redirect( $destination, 302 ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Deliberately off-site; the target comes from Settings::thankyou_destinations()/the filter, never from the request.
 
 		exit;
 	}
@@ -107,12 +127,17 @@ final class Thankyou_Redirect {
 		/**
 		 * Filters the thank-you page for each `_idp_order_from` value.
 		 *
+		 * The settings screen's "Thank-you redirects" table (IDTA PDF →
+		 * Uploads) is the normal way to change these; this filter remains for
+		 * a custom change that table can't express, applied on top of
+		 * whatever is configured there.
+		 *
 		 * @param array<string,string> $destinations URLs keyed by source.
 		 * @param \WC_Order            $order        Order object.
 		 */
 		$destinations = (array) apply_filters(
 			'idta_pdf_thankyou_destinations',
-			self::DESTINATIONS,
+			$this->settings->thankyou_destinations(),
 			$order
 		);
 
