@@ -84,6 +84,7 @@ final class Order_List_Column {
 		$columns = is_array( $columns ) ? $columns : array();
 
 		$columns[ self::COLUMN ] = __( 'PDFs', 'idta-pdf' );
+		$columns[ 'idta_order_from' ] = __( 'Order From', 'idta-pdf' );
 
 		return $columns;
 	}
@@ -113,12 +114,18 @@ final class Order_List_Column {
 	 * @param \WC_Order|mixed $order  Order object.
 	 */
 	public function render_hpos_column( $column, $order ): void {
-		if ( self::COLUMN !== $column ) {
+		if ( self::COLUMN !== $column && 'idta_order_from' !== $column ) {
 			return;
 		}
 
 		if ( $order instanceof \WC_Order ) {
-			$this->render( $order );
+			if ( self::COLUMN == $column ) {
+				$this->render( $order );
+			}
+			
+			if ( 'idta_order_from' == $column ) {
+				echo strtoupper( esc_html( $order->get_meta( '_idp_order_from', true ) ?: '—' ) );
+			}
 		}
 	}
 

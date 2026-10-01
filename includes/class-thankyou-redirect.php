@@ -165,6 +165,51 @@ final class Thankyou_Redirect {
 			$args['transaction-id'] = $transaction;
 		}
 
+		/*
+		 * Everything from here down is for the thank-you page's own content —
+		 * the conversion tag above only reads transaction-id/currency/value —
+		 * so each of these is optional and the page is expected to fall back
+		 * sensibly when one is missing (an order the checkout didn't finish
+		 * writing IDP meta for, for instance).
+		 */
+		$data = new Order_Data( $order );
+
+		$email = trim( $data->email() );
+
+		if ( '' !== $email ) {
+			$args['email'] = $email;
+		}
+
+		// Whatever the checkout actually sent ('digital_only' or
+		// 'print_digital'); the thank-you page branches its own copy on this
+		// rather than trying to re-derive it from the line items.
+		$format = trim( (string) $order->get_meta( '_idp_format', true ) );
+
+		if ( '' !== $format ) {
+			$args['format'] = $format;
+		}
+
+		$args['validity-years'] = (string) $data->validity_years();
+
+		$payment_method = trim( $order->get_payment_method_title() );
+
+		if ( '' !== $payment_method ) {
+			// Shown as-is, not reformatted into "Brand •••• 1234": this plugin
+			// has no reliable access to the card's last four digits (that
+			// lives in the payment gateway's own, gateway-specific meta, not
+			// anything _idp_ writes), and a fabricated card number would be
+			// worse than none.
+			$args['payment-method'] = $payment_method;
+		}
+
+		$created = $order->get_date_created();
+
+		if ( $created instanceof \WC_DateTime ) {
+			// ISO 8601, so the thank-you page can format it in the visitor's
+			// own locale rather than this site's.
+			$args['order-date'] = $created->format( \DateTimeInterface::ATOM );
+		}
+
 		$args['currency'] = $order->get_currency();
 
 		/*
